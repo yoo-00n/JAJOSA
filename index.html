@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PNU 협의·서명 관리 · 작업방(사업지구)별 폴더</title>
+  <style>
+    :root{
+      --bg:#0b1020; --card:#111834; --muted:#8fa3c1; --text:#e8eefb; --brand:#5aa0ff; --accent:#46e0b7; --danger:#ff6b6b;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:linear-gradient(180deg,#0a0f1e 0%,#0b1226 100%);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Pretendard,Apple SD Gothic Neo,Noto Sans KR,sans-serif}
+    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(6px);background:rgba(10,15,30,.7);border-bottom:1px solid rgba(255,255,255,.06)}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    h1{margin:8px 0 12px;font-size:20px;letter-spacing:.2px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .btn{border:1px solid rgba(255,255,255,.1);background:#141b36;color:var(--text);padding:10px 14px;border-radius:12px;font-size:14px;cursor:pointer}
+    .btn:hover{border-color:rgba(255,255,255,.2)}
+    .btn.brand{background:linear-gradient(180deg,#579bff,#4f8fff);border:none;color:white}
+    .btn.accent{background:linear-gradient(180deg,#49e6bb,#35cfa6);border:none;color:#0b1020}
+    .btn.danger{background:#331a1a;border:1px solid #582727;color:#ffb3b3}
+    .btn.ghost{background:transparent;border:1px dashed rgba(255,255,255,.25)}
+    .grid{display:grid;gap:14px}
+    .card{background:linear-gradient(180deg,#0f1734 0%,#0d142c 100%);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:16px}
+    label{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1734;color:var(--text);font-size:14px}
+    input[type="file"]{padding:8px;background:transparent;border:1px dashed rgba(255,255,255,.25)}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    thead th{font-size:12px;color:var(--muted);text-align:left;padding:4px 8px}
+    tbody td{background:#0f1734;padding:10px 8px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+    tbody tr{transition:transform .12s ease}
+    tbody tr:hover{transform:translateY(-1px)}
+    tbody td:first-child{border-left:1px solid rgba(255,255,255,.06);border-top-left-radius:12px;border-bottom-left-radius:12px}
+    tbody td:last-child{border-right:1px solid rgba(255,255,255,.06);border-top-right-radius:12px;border-bottom-right-radius:12px}
+    .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;border:1px solid rgba(255,255,255,.12)}
+    .pill.ok{background:rgba(70,224,183,.12);color:#8af0d8;border-color:rgba(70,224,183,.3)}
+    .pill.no{background:rgba(255,107,107,.1);color:#ffc1c1;border-color:rgba(255,107,107,.25)}
+    .row{display:flex;gap:10px;flex-wrap:wrap}
+    .row > *{flex:1}
+    .right{margin-left:auto}
+    .muted{color:var(--muted)}
+    .sr{position:absolute;left:-9999px}
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:40}
+    .modal.open{display:flex}
+    .modal .sheet{background:#0f1734;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;max-width:95vw;width:680px}
+    canvas{width:100%;height:320px;background:white;border-radius:12px}
+    .help{font-size:13px;color:var(--muted)}
+    .small{font-size:12px}
+    .tag{display:inline-block;background:#16224a;border:1px solid rgba(255,255,255,.1);padding:2px 8px;border-radius:8px;color:#b9c8e3;font-size:12px}
+    .kbar{display:flex;gap:8px;align-items:center;margin:8px 0}
+    .kbar input{flex:1}
+    footer{padding:40px 16px;color:#8fa3c1;text-align:center}
+    @media (max-width:820px){
+      .hide-m{display:none}
+      header .toolbar{gap:6px}
+      .btn{padding:8px 10px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>📑 PNU 협의·서명 관리 <span class="muted">· 작업방(사업지구)별</span></h1>
+      <div class="toolbar">
+        <!-- 작업방 선택/관리 -->
+        <label class="muted">작업방</label>
+        <select id="wsSelect" title="작업방(사업지구) 선택"></select>
+        <button id="btnAddWs" class="btn">+ 작업방</button>
+        <button id="btnRenameWs" class="btn">이름변경</button>
+        <button id="btnDelWs" class="btn danger">삭제</button>
+        <span class="right"></span>
+
+        <!-- 파일 입출력 -->
+        <label class="btn ghost" for="excelFile">📥 엑셀 불러오기</label>
+        <input id="excelFile" class="sr" type="file" accept=".xlsx,.xls" />
+        <button id="btnTemplate" class="btn">📄 템플릿</button>
+        <button id="btnExportXlsx" class="btn">📤 엑셀로</button>
+        <button id="btnExportJson" class="btn">🧰 백업(JSON)</button>
+        <button id="btnImportJson" class="btn">🧰 복원(JSON)</button>
+        <input id="jsonFile" class="sr" type="file" accept="application/json" />
+        <button id="btnReset" class="btn danger">DB 초기화</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap grid" style="margin-top:8px">
+    <section class="card" id="howto">
+      <div class="row">
+        <div>
+          <strong>목적</strong>
+          <div class="help">작업방(사업지구/행정구역) 단위로 <span class="tag">PNU</span>별 <span class="tag">소유자</span>·<span class="tag">지번</span>·<span class="tag">협의내용</span>·<span class="tag">전자서명</span>을 관리합니다. 각 작업방은 폴더처럼 완전히 분리됩니다.</div>
+        </div>
+        <div class="right help hide-m">저장 위치: 브라우저 로컬 DB(IndexedDB). 여러 명 공동 작업은 백엔드 연동이 필요합니다.</div>
+      </div>
+    </section>
+
+    <section class="card" id="importer">
+      <div class="row">
+        <div>
+          <label for="excelFile"><strong>1) 엑셀(.xlsx) 선택</strong></label>
+          <div class="help">필수 헤더 권장: <code>PNU</code>, <code>소유자</code>, <code>지번</code>, <code>협의내용</code> (헤더명이 달라도 매핑 가능). 업로드는 <strong>현재 작업방</strong>에 반영됩니다.</div>
+        </div>
+      </div>
+      <div id="mapBox" style="display:none;margin-top:12px">
+        <div class="row">
+          <div><label>엑셀 헤더 → PNU</label><select id="mapPnu"></select></div>
+          <div><label>엑셀 헤더 → 소유자</label><select id="mapOwner"></select></div>
+          <div><label>엑셀 헤더 → 지번</label><select id="mapLot"></select></div>
+          <div><label>엑셀 헤더 → 협의내용</label><select id="mapNote"></select></div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button id="btnApplyMap" class="btn brand">매핑 적용 & 저장</button>
+          <div class="help">동일 PNU는 업데이트됩니다(작업방 내에서만).</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" id="editor">
+      <div class="kbar">
+        <input id="q" placeholder="PNU 또는 소유자/지번 검색 (현재 작업방)" />
+        <button id="btnNew" class="btn accent">+ 신규</button>
+      </div>
+      <div class="help">PNU는 고유키입니다(문자열 저장). 작업방마다 별도로 관리됩니다.</div>
+      <div style="overflow:auto">
+        <table>
+          <thead>
+            <tr>
+              <th style="min-width:160px">PNU</th>
+              <th style="min-width:140px">소유자</th>
+              <th style="min-width:160px">지번</th>
+              <th>협의 내용</th>
+              <th class="hide-m" style="min-width:120px">서명</th>
+              <th style="min-width:220px">작업</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="cloudInfo">
+      <strong>여러 명이 함께 쓰기(선택)</strong>
+      <div class="help">현재는 로컬 전용입니다. 공동 사용을 원하면 Firebase/Supabase 연동 버전을 요청하세요(작업방별 권한/로그 포함).</div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="small">※ 서명은 이미지 캡처입니다. 법적 전자서명은 별도 연동 필요.</div>
+  </footer>
+
+  <!-- libs -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.2.0/dist/signature_pad.umd.min.js"></script>
+
+  <script>
+  // ------------------------------
+  // DB (IndexedDB via Dexie) — 작업방(Workspace) 지원
+  // ------------------------------
+  const db = new Dexie('pnu_agreements');
+  // v1 → v2 마이그레이션: records(pnu), signatures(pnu) → 작업방 분리 구조
+  db.version(1).stores({
+    records: 'pnu',
+    signatures: 'pnu'
+  });
+  db.version(2).stores({
+    workspaces: 'name',                   // 작업방 이름 고유
+    records: '[ws+pnu], ws, pnu',         // 복합 PK: 작업방+PNU
+    signatures: '[ws+pnu], ws, pnu'       // 서명도 작업방별 분리
+  }).upgrade(async tx => {
+    // 기존 데이터가 있다면 기본 작업방("기본")으로 이동
+    const oldRecs = await tx.table('records').toArray().catch(()=>[]);
+    const oldSigs = await tx.table('signatures').toArray().catch(()=>[]);
+    if (oldRecs.length || oldSigs.length) {
+      await tx.table('workspaces').put({ name: '기본' });
+      for (const r of oldRecs) {
+        await tx.table('records').put({ ws:'기본', pnu:r.pnu, owner:r.owner, lot:r.lot, note:r.note });
+      }
+      for (const s of oldSigs) {
+        await tx.table('signatures').put({ ws:'기본', pnu:s.pnu, dataUrl:s.dataUrl, signedAt:s.signedAt });
+      }
+    } else {
+      // 최초 설치 시 기본 작업방 생성
+      await tx.table('workspaces').put({ name: '기본' });
+    }
+  });
+
+  // DOM helpers
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+  const wsSelect = $('#wsSelect');
+
+  // State
+  let excelHeaders = [];
+  let excelRows = [];
+  let currentQuery = '';
+  let currentWS = localStorage.getItem('pnu_current_ws') || '기본';
+
+  // Initialize workspaces select
+  async function refreshWorkspaces(){
+    let list = await db.workspaces.toArray();
+    if(!list.find(w=>w.name===currentWS)){
+      // ensure current exists
+      if(list.length===0){ await db.workspaces.put({name:'기본'}); list = await db.workspaces.toArray(); }
+      currentWS = list[0]?.name || '기본';
+      localStorage.setItem('pnu_current_ws', currentWS);
+    }
+    wsSelect.innerHTML = list.map(w=>`<option ${w.name===currentWS?'selected':''} value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
+  }
+
+  wsSelect.addEventListener('change', async (e)=>{
+    currentWS = e.target.value; localStorage.setItem('pnu_current_ws', currentWS); refreshList();
+  });
+
+  // Workspace CRUD buttons
+  $('#btnAddWs').addEventListener('click', async ()=>{
+    const name = prompt('새 작업방 이름 (예: 서울-종로구, A지구 1공구 등)');
+    if(!name) return; const n = name.trim(); if(!n) return;
+    const exists = await db.workspaces.get(n);
+    if(exists){ alert('같은 이름의 작업방이 이미 있습니다.'); return; }
+    await db.workspaces.put({ name:n });
+    currentWS = n; localStorage.setItem('pnu_current_ws', currentWS);
+    await refreshWorkspaces(); await refreshList();
+  });
+
+  $('#btnRenameWs').addEventListener('click', async ()=>{
+    const old = currentWS;
+    const neo = prompt(`작업방 이름 변경: ${old} →`, old);
+    if(neo===null) return; const n = neo.trim(); if(!n) return;
+    if(n===old) return;
+    if(await db.workspaces.get(n)){ alert('해당 이름은 이미 존재합니다.'); return; }
+    // 이름 변경: workspace 이름을 변경하면 관련 레코드 키(ws)도 업데이트 필요
+    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
+      await db.workspaces.delete(old);
+      await db.workspaces.put({ name:n });
+      const recs = await db.records.where('ws').equals(old).toArray();
+      for(const r of recs){ await db.records.delete([old, r.pnu]); await db.records.put({ ...r, ws:n }); }
+      const sigs = await db.signatures.where('ws').equals(old).toArray();
+      for(const s of sigs){ await db.signatures.delete([old, s.pnu]); await db.signatures.put({ ...s, ws:n }); }
+    });
+    currentWS = n; localStorage.setItem('pnu_current_ws', currentWS);
+    await refreshWorkspaces(); await refreshList();
+  });
+
+  $('#btnDelWs').addEventListener('click', async ()=>{
+    const name = currentWS;
+    const list = await db.workspaces.toArray();
+    if(list.length<=1){ alert('최소 1개의 작업방은 필요합니다.'); return; }
+    if(!confirm(`작업방 "${name}"을(를) 삭제할까요?\n이 작업은 되돌릴 수 없고, 해당 작업방의 모든 레코드/서명이 삭제됩니다.`)) return;
+    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
+      await db.workspaces.delete(name);
+      const recs = await db.records.where('ws').equals(name).toArray();
+      for(const r of recs){ await db.records.delete([name, r.pnu]); }
+      const sigs = await db.signatures.where('ws').equals(name).toArray();
+      for(const s of sigs){ await db.signatures.delete([name, s.pnu]); }
+    });
+    // switch to another ws
+    const remain = await db.workspaces.toArray();
+    currentWS = remain[0].name; localStorage.setItem('pnu_current_ws', currentWS);
+    await refreshWorkspaces(); await refreshList();
+  });
+
+  // Elements
+  const fileInput = $('#excelFile');
+  const mapBox = $('#mapBox');
+  const mapPnu = $('#mapPnu');
+  const mapOwner = $('#mapOwner');
+  const mapLot = $('#mapLot');
+  const mapNote = $('#mapNote');
+  const btnApplyMap = $('#btnApplyMap');
+  const rowsEl = $('#rows');
+  const qEl = $('#q');
+
+  // File upload handler
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if(!file) return;
+    const { headers, rows } = await parseExcel(file);
+    excelHeaders = headers; excelRows = rows;
+    buildMappingSelects(headers);
+    mapBox.style.display = 'block';
+  });
+
+  function buildMappingSelects(headers){
+    const fill = (sel, guessList=[]) => {
+      sel.innerHTML = '<option value="">(사용 안함)</option>' + headers.map((h,i)=>`<option value="${i}">${escapeHtml(h)}</option>`).join('');
+      for(const g of guessList){
+        const idx = headers.findIndex(h => h.toLowerCase().includes(g));
+        if(idx>=0){ sel.value = String(idx); break; }
+      }
+    }
+    fill(mapPnu, ['pnu','필지','고유','parcel']);
+    fill(mapOwner, ['소유','owner','성명','이름','대표']);
+    fill(mapLot, ['지번','주소','lot','parcel','address']);
+    fill(mapNote, ['협의','내용','비고','note','memo']);
+  }
+
+  btnApplyMap.addEventListener('click', async () => {
+    if(!excelRows.length){ alert('엑셀을 먼저 불러오세요.'); return; }
+    const idx = {
+      pnu: parseInt(mapPnu.value,10),
+      owner: parseInt(mapOwner.value,10),
+      lot: parseInt(mapLot.value,10),
+      note: parseInt(mapNote.value,10)
+    };
+    if(Number.isNaN(idx.pnu)) { alert('PNU 매핑은 필수입니다.'); return; }
+
+    let upserted = 0;
+    await db.transaction('rw', db.records, async () => {
+      for(const row of excelRows){
+        const rec = {
+          ws: currentWS,
+          pnu: normalizePnu(cell(row, idx.pnu)),
+          owner: cell(row, idx.owner),
+          lot: cell(row, idx.lot),
+          note: cell(row, idx.note)
+        };
+        if(!rec.pnu) continue;
+        await db.records.put(rec); // key = [ws, pnu]
+        upserted++;
+      }
+    });
+    alert(`(${currentWS}) 총 ${upserted.toLocaleString()}건 저장/갱신 완료.`);
+    mapBox.style.display = 'none';
+    fileInput.value = '';
+    await refreshList();
+  });
+
+  // Parse Excel (first sheet)
+  async function parseExcel(file){
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data, { type:'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+    const headers = rows.shift()?.map(String) ?? [];
+    return { headers, rows };
+  }
+  function cell(row, idx){ if(Number.isNaN(idx)) return ''; return (row?.[idx] ?? '').toString().trim(); }
+  function normalizePnu(v){ if(!v) return ''; return String(v).replace(/\s+/g,'').replace(/[^0-9-]/g,''); }
+
+  // Render list (current workspace only)
+  async function refreshList(){
+    const all = await db.records.where('ws').equals(currentWS).toArray();
+    const sigs = await db.signatures.where('ws').equals(currentWS).toArray();
+    const sigMap = new Map(sigs.map(s => [s.pnu, s]));
+
+    const q = currentQuery.trim().toLowerCase();
+    const filtered = q
+      ? all.filter(r => r.pnu.toLowerCase().includes(q) || (r.owner||'').toLowerCase().includes(q) || (r.lot||'').toLowerCase().includes(q))
+      : all;
+
+    filtered.sort((a,b)=> a.pnu.localeCompare(b.pnu));
+
+    rowsEl.innerHTML = filtered.map(r => {
+      const s = sigMap.get(r.pnu);
+      const signed = !!s?.dataUrl;
+      const when = s?.signedAt ? new Date(s.signedAt).toLocaleString() : '';
+      return `<tr>
+        <td><span class="small muted">#</span> ${escapeHtml(r.pnu)}</td>
+        <td>${escapeHtml(r.owner||'')}</td>
+        <td>${escapeHtml(r.lot||'')}</td>
+        <td>${escapeHtml(r.note||'')}</td>
+        <td class="hide-m">${signed?`<span class="pill ok">서명 완료</span><div class="small muted">${escapeHtml(when)}</div>`:`<span class="pill no">미서명</span>`}</td>
+        <td>
+          <div class="row" style="gap:6px">
+            <button class="btn" onclick="openEdit('${encodeURIComponent(r.pnu)}')">✏️ 수정</button>
+            <button class="btn accent" onclick="openSign('${encodeURIComponent(r.pnu)}')">✍️ 서명</button>
+            <button class="btn" onclick="previewSign('${encodeURIComponent(r.pnu)}')">🖼️ 서명보기</button>
+            <button class="btn danger" onclick="delRec('${encodeURIComponent(r.pnu)}')">🗑️ 삭제</button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  qEl.addEventListener('input', (e)=>{ currentQuery = e.target.value; refreshList(); });
+
+  // New record
+  $('#btnNew').addEventListener('click', ()=> openEdit(''));
+
+  async function delRec(encPnu){
+    const pnu = decodeURIComponent(encPnu);
+    if(!confirm(`삭제할까요?\n[${currentWS}] PNU: ${pnu}`)) return;
+    await db.transaction('rw', db.records, db.signatures, async () => {
+      await db.records.delete([currentWS, pnu]);
+      await db.signatures.delete([currentWS, pnu]);
+    });
+    refreshList();
+  }
+
+  // Simple edit modal using prompt (빠른 편집)
+  async function openEdit(encPnu){
+    const pnuKey = decodeURIComponent(encPnu);
+    const rec = pnuKey ? (await db.records.get([currentWS, pnuKey])) : { pnu:'', owner:'', lot:'', note:'' };
+    const pPnu = prompt(`[${currentWS}] PNU (고유키):`, rec?.pnu ?? '');
+    if(pPnu===null) return;
+    const pOwner = prompt('소유자:', rec?.owner ?? ''); if(pOwner===null) return;
+    const pLot = prompt('지번:', rec?.lot ?? ''); if(pLot===null) return;
+    const pNote = prompt('협의 내용:', rec?.note ?? ''); if(pNote===null) return;
+
+    const newRec = { ws:currentWS, pnu: normalizePnu(pPnu), owner:pOwner.trim(), lot:pLot.trim(), note:pNote.trim() };
+    if(!newRec.pnu){ alert('PNU는 필수입니다.'); return; }
+
+    if(pnuKey && pnuKey!==newRec.pnu){ // 키 변경 시 기존 삭제
+      await db.records.delete([currentWS, pnuKey]);
+      const sig = await db.signatures.get([currentWS, pnuKey]);
+      if(sig){ await db.signatures.delete([currentWS, pnuKey]); await db.signatures.put({ ws:currentWS, pnu:newRec.pnu, ...sig }); }
+    }
+    await db.records.put(newRec);
+    refreshList();
+  }
+
+  // Signature Modal (workspace-aware)
+  let sigModal, sigPad, sigCanvas, sigCtx, sigPnu = '';
+  function ensureSignModal(){
+    if(sigModal) return;
+    sigModal = document.createElement('div');
+    sigModal.className = 'modal';
+    sigModal.innerHTML = `
+      <div class="sheet">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">전자 서명</h3>
+          <span class="right"></span>
+          <button class="btn" id="btnCloseSign">닫기</button>
+        </div>
+        <div class="help" id="signTarget" style="margin:6px 0 10px"></div>
+        <canvas id="sigCanvas" width="1024" height="512"></canvas>
+        <div class="row" style="margin-top:10px">
+          <button class="btn" id="btnClearSig">지우기</button>
+          <button class="btn brand" id="btnSaveSig">서명 저장</button>
+        </div>
+        <div class="help">손가락/펜으로 서명해 주세요. 저장 시 이미지가 로컬 DB에 암호화 없이 저장됩니다.</div>
+      </div>`;
+    document.body.appendChild(sigModal);
+
+    sigCanvas = sigModal.querySelector('#sigCanvas');
+    sigCtx = sigCanvas.getContext('2d');
+    sigPad = new SignaturePad.SignaturePad(sigCanvas, { backgroundColor: 'white', penColor: 'black' });
+
+    sigModal.querySelector('#btnCloseSign').addEventListener('click', ()=> closeSign());
+    sigModal.querySelector('#btnClearSig').addEventListener('click', ()=> sigPad.clear());
+    sigModal.querySelector('#btnSaveSig').addEventListener('click', saveSignature);
+
+    const resizeCanvas = () => {
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const rect = sigCanvas.getBoundingClientRect();
+      sigCanvas.width = rect.width * ratio; sigCanvas.height = rect.height * ratio; sigCtx.scale(ratio, ratio); sigPad.clear();
+    };
+    const ro = new ResizeObserver(resizeCanvas); ro.observe(sigCanvas);
+  }
+
+  window.openSign = async (encPnu) => {
+    ensureSignModal();
+    sigPnu = decodeURIComponent(encPnu);
+    const rec = await db.records.get([currentWS, sigPnu]);
+    if(!rec){ alert('레코드가 없습니다.'); return; }
+    sigModal.querySelector('#signTarget').textContent = `[${currentWS}] PNU ${rec.pnu} · ${rec.owner||''} · ${rec.lot||''}`;
+    sigPad.clear();
+    const existing = await db.signatures.get([currentWS, sigPnu]);
+    if(existing?.dataUrl){
+      const img = new Image(); img.onload = ()=>{ const c = sigCanvas; const ctx = c.getContext('2d'); ctx.globalAlpha = 0.18; ctx.drawImage(img, 0, 0, c.width, c.height); ctx.globalAlpha = 1; };
+      img.src = existing.dataUrl;
+    }
+    sigModal.classList.add('open');
+  }
+  function closeSign(){ sigModal?.classList.remove('open'); }
+  async function saveSignature(){
+    if(sigPad.isEmpty()){ alert('서명이 비어 있습니다.'); return; }
+    const dataUrl = sigPad.toDataURL('image/png');
+    await db.signatures.put({ ws:currentWS, pnu: sigPnu, dataUrl, signedAt: new Date().toISOString() });
+    closeSign(); refreshList();
+  }
+  window.previewSign = async (encPnu) => {
+    const pnu = decodeURIComponent(encPnu);
+    const s = await db.signatures.get([currentWS, pnu]);
+    if(!s?.dataUrl){ alert('서명이 없습니다.'); return; }
+    const win = window.open(); win.document.write(`<img alt="signature" src="${s.dataUrl}">`);
+  }
+
+  // Export: XLSX (현재 작업방만)
+  $('#btnExportXlsx').addEventListener('click', async ()=>{
+    const recs = await db.records.where('ws').equals(currentWS).toArray();
+    const sigs = new Map((await db.signatures.where('ws').equals(currentWS).toArray()).map(s => [s.pnu, s]));
+    const rows = recs.map(r=>({
+      작업방: currentWS,
+      PNU: r.pnu,
+      소유자: r.owner||'',
+      지번: r.lot||'',
+      협의내용: r.note||'',
+      서명여부: sigs.has(r.pnu) ? 'Y' : 'N',
+      서명시각: sigs.get(r.pnu)?.signedAt ? new Date(sigs.get(r.pnu).signedAt).toLocaleString() : ''
+    }));
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, currentWS.slice(0,31));
+    XLSX.writeFile(wb, `pnu_${sanitizeFile(currentWS)}_${fmtDate()}.xlsx`);
+  });
+
+  // Export/Import JSON (전체 DB)
+  $('#btnExportJson').addEventListener('click', async ()=>{
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      workspaces: await db.workspaces.toArray(),
+      records: await db.records.toArray(),
+      signatures: await db.signatures.toArray()
+    };
+    downloadBlob(new Blob([JSON.stringify(payload,null,2)], {type:'application/json'}), `pnu_backup_all_${fmtDate()}.json`);
+  });
+  $('#btnImportJson').addEventListener('click', ()=> $('#jsonFile').click());
+  $('#jsonFile').addEventListener('change', async (e)=>{
+    const f = e.target.files?.[0]; if(!f) return;
+    const text = await f.text();
+    const data = JSON.parse(text);
+    if(!Array.isArray(data.records) || !Array.isArray(data.signatures)) { alert('백업 형식이 올바르지 않습니다.'); return; }
+    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
+      await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear();
+      const wsList = data.workspaces?.length ? data.workspaces : [{name:'기본'}];
+      for(const w of wsList) await db.workspaces.put({ name:w.name });
+      for(const r of data.records) await db.records.put(r);
+      for(const s of data.signatures) await db.signatures.put(s);
+    });
+    await refreshWorkspaces(); alert('복원 완료'); refreshList();
+  });
+
+  // Template xlsx (작업방 무관)
+  $('#btnTemplate').addEventListener('click', ()=>{
+    const wb = XLSX.utils.book_new();
+    const rows = [ { PNU:'1111010100100000000', 소유자:'홍길동', 지번:'서울 종로구 1-1', 협의내용:'보상 협의 1차 완료' } ];
+    const ws = XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb, ws, '템플릿');
+    XLSX.writeFile(wb, 'pnu_template.xlsx');
+  });
+
+  // Reset DB (모든 작업방 포함 전부 삭제)
+  $('#btnReset').addEventListener('click', async ()=>{
+    if(!confirm('DB를 초기화할까요? 모든 작업방의 레코드/서명이 삭제됩니다.')) return;
+    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{ await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear(); });
+    await db.workspaces.put({ name:'기본' }); currentWS='기본'; localStorage.setItem('pnu_current_ws', currentWS);
+    await refreshWorkspaces(); refreshList();
+  });
+
+  // Helpers
+  function fmtDate(){ const d = new Date(); const p = n=> String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
+  function downloadBlob(blob, filename){ const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); setTimeout(()=> URL.revokeObjectURL(a.href), 2000); }
+  function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
+  function sanitizeFile(s){ return s.replace(/[^\w\-가-힣]/g,'_').slice(0,60); }
+
+  // Kick
+  (async function init(){ await refreshWorkspaces(); await refreshList(); })();
+  </script>
+</body>
+</html>
