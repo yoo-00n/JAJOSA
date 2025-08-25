@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PNU 협의·서명 관리 · 작업방(사업지구)별 폴더</title>
+  <title>PNU 협의·서명 관리 · 작업방(사업지구)별 폴더 — ㄱ 버전</title>
   <style>
     :root{
       --bg:#0b1020; --card:#111834; --muted:#8fa3c1; --text:#e8eefb; --brand:#5aa0ff; --accent:#46e0b7; --danger:#ff6b6b;
@@ -25,9 +25,15 @@
     label{font-size:12px;color:var(--muted)}
     input,select,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1734;color:var(--text);font-size:14px}
     input[type="file"]{padding:8px;background:transparent;border:1px dashed rgba(255,255,255,.25)}
-    table{width:100%;border-collapse:separate;border-spacing:0 8px}
+    table{width:100%;border-collapse:separate;border-spacing:0 8px; table-layout:fixed}
+    col.pnu{width:140px}
+    col.owner{width:140px}
+    col.lot{width:160px}
+    col.note{width:auto}
+    col.sign{width:120px}
+    col.ops{width:260px}
     thead th{font-size:12px;color:var(--muted);text-align:left;padding:4px 8px}
-    tbody td{background:#0f1734;padding:10px 8px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06)}
+    tbody td{background:#0f1734;padding:10px 8px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     tbody tr{transition:transform .12s ease}
     tbody tr:hover{transform:translateY(-1px)}
     tbody td:first-child{border-left:1px solid rgba(255,255,255,.06);border-top-left-radius:12px;border-bottom-left-radius:12px}
@@ -43,7 +49,6 @@
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:40}
     .modal.open{display:flex}
     .modal .sheet{background:#0f1734;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;max-width:95vw;width:680px}
-    canvas{width:100%;height:320px;background:white;border-radius:12px}
     .help{font-size:13px;color:var(--muted)}
     .small{font-size:12px}
     .tag{display:inline-block;background:#16224a;border:1px solid rgba(255,255,255,.1);padding:2px 8px;border-radius:8px;color:#b9c8e3;font-size:12px}
@@ -54,13 +59,16 @@
       .hide-m{display:none}
       header .toolbar{gap:6px}
       .btn{padding:8px 10px}
+      col.pnu{width:120px}
+      col.owner{width:120px}
+      col.lot{width:140px}
     }
   </style>
 </head>
 <body>
   <header>
     <div class="wrap">
-      <h1>📑 PNU 협의·서명 관리 <span class="muted">· 작업방(사업지구)별</span></h1>
+      <h1>📑 PNU 협의·서명 관리 <span class="muted">· 작업방(사업지구)별</span> <span class="muted">— ㄱ 버전</span></h1>
       <div class="toolbar">
         <!-- 작업방 선택/관리 -->
         <label class="muted">작업방</label>
@@ -68,7 +76,13 @@
         <button id="btnAddWs" class="btn">+ 작업방</button>
         <button id="btnRenameWs" class="btn">이름변경</button>
         <button id="btnDelWs" class="btn danger">삭제</button>
+
         <span class="right"></span>
+
+        <!-- 검색 & 정렬 -->
+        <input id="q" placeholder="PNU / 소유자 / 지번 검색" style="max-width:280px">
+        <button id="sortOwnerAsc" class="btn">소유자 ▲</button>
+        <button id="sortOwnerDesc" class="btn">소유자 ▼</button>
 
         <!-- 파일 입출력 -->
         <label class="btn ghost" for="excelFile">📥 엑셀 불러오기</label>
@@ -88,7 +102,7 @@
       <div class="row">
         <div>
           <strong>목적</strong>
-          <div class="help">작업방(사업지구/행정구역) 단위로 <span class="tag">PNU</span>별 <span class="tag">소유자</span>·<span class="tag">지번</span>·<span class="tag">협의내용</span>·<span class="tag">전자서명</span>을 관리합니다. 각 작업방은 폴더처럼 완전히 분리됩니다.</div>
+          <div class="help">작업방(사업지구/행정구역) 단위로 <span class="tag">PNU</span>별 <span class="tag">소유자</span>·<span class="tag">지번</span>·<span class="tag">협의내용</span>·<span class="tag">전자서명(PNG 업로드)</span>을 관리합니다.</div>
         </div>
         <div class="right help hide-m">저장 위치: 브라우저 로컬 DB(IndexedDB). 여러 명 공동 작업은 백엔드 연동이 필요합니다.</div>
       </div>
@@ -116,25 +130,27 @@
     </section>
 
     <section class="card" id="editor">
-      <div class="kbar">
-        <input id="q" placeholder="PNU 또는 소유자/지번 검색 (현재 작업방)" />
-        <button id="btnNew" class="btn accent">+ 신규</button>
-      </div>
-      <div class="help">PNU는 고유키입니다(문자열 저장). 작업방마다 별도로 관리됩니다.</div>
+      <div class="help">※ 이 버전에서는 <strong>‘협의 내용’만 수정</strong>할 수 있습니다. PNU/소유자/지번 변경은 엑셀 재업로드나 삭제 후 재등록을 사용하세요.</div>
       <div style="overflow:auto">
         <table>
+          <colgroup>
+            <col class="pnu"><col class="owner"><col class="lot"><col class="note"><col class="sign"><col class="ops">
+          </colgroup>
           <thead>
             <tr>
-              <th style="min-width:160px">PNU</th>
-              <th style="min-width:140px">소유자</th>
-              <th style="min-width:160px">지번</th>
+              <th>PNU</th>
+              <th>소유자</th>
+              <th>지번</th>
               <th>협의 내용</th>
-              <th class="hide-m" style="min-width:120px">서명</th>
-              <th style="min-width:220px">작업</th>
+              <th class="hide-m">서명</th>
+              <th>작업</th>
             </tr>
           </thead>
           <tbody id="rows"></tbody>
         </table>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnNew" class="btn accent">+ 신규</button>
       </div>
     </section>
 
@@ -145,30 +161,27 @@
   </main>
 
   <footer>
-    <div class="small">※ 서명은 이미지 캡처입니다. 법적 전자서명은 별도 연동 필요.</div>
+    <div class="small">※ 서명 PNG는 로컬 DB에 <u>암호화 없이</u> 저장됩니다. 실서명은 별도 전자서명 시스템 연동이 필요합니다.</div>
   </footer>
 
   <!-- libs -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.2.0/dist/signature_pad.umd.min.js"></script>
 
   <script>
   // ------------------------------
   // DB (IndexedDB via Dexie) — 작업방(Workspace) 지원
   // ------------------------------
   const db = new Dexie('pnu_agreements');
-  // v1 → v2 마이그레이션: records(pnu), signatures(pnu) → 작업방 분리 구조
   db.version(1).stores({
     records: 'pnu',
     signatures: 'pnu'
   });
   db.version(2).stores({
-    workspaces: 'name',                   // 작업방 이름 고유
-    records: '[ws+pnu], ws, pnu',         // 복합 PK: 작업방+PNU
-    signatures: '[ws+pnu], ws, pnu'       // 서명도 작업방별 분리
+    workspaces: 'name',
+    records: '[ws+pnu], ws, pnu',
+    signatures: '[ws+pnu], ws, pnu'
   }).upgrade(async tx => {
-    // 기존 데이터가 있다면 기본 작업방("기본")으로 이동
     const oldRecs = await tx.table('records').toArray().catch(()=>[]);
     const oldSigs = await tx.table('signatures').toArray().catch(()=>[]);
     if (oldRecs.length || oldSigs.length) {
@@ -180,27 +193,54 @@
         await tx.table('signatures').put({ ws:'기본', pnu:s.pnu, dataUrl:s.dataUrl, signedAt:s.signedAt });
       }
     } else {
-      // 최초 설치 시 기본 작업방 생성
       await tx.table('workspaces').put({ name: '기본' });
     }
   });
 
-  // DOM helpers
+  // DOM helpers & state
   const $ = sel => document.querySelector(sel);
-  const $$ = sel => Array.from(document.querySelectorAll(sel));
   const wsSelect = $('#wsSelect');
+  const fileInput = $('#excelFile');
+  const mapBox = $('#mapBox');
+  const mapPnu = $('#mapPnu');
+  const mapOwner = $('#mapOwner');
+  const mapLot = $('#mapLot');
+  const mapNote = $('#mapNote');
+  const btnApplyMap = $('#btnApplyMap');
+  const rowsEl = $('#rows');
+  const qEl = $('#q');
+  const sortOwnerAscBtn = $('#sortOwnerAsc');
+  const sortOwnerDescBtn = $('#sortOwnerDesc');
 
-  // State
   let excelHeaders = [];
   let excelRows = [];
   let currentQuery = '';
   let currentWS = localStorage.getItem('pnu_current_ws') || '기본';
+  let sortMode = 'pnu'; // 'pnu' | 'ownerAsc' | 'ownerDesc'
+  let lastWS = currentWS;
 
-  // Initialize workspaces select
+  // ------------------------------
+  // 작업방 접근 보안: 진입 시 암호 확인
+  // ------------------------------
+  const WS_PASS = "lx전북재조사추진단";
+  function wsKey(ws){ return `ws_authed_${ws}`; }
+  async function ensureWorkspaceAuth(ws){
+    if(sessionStorage.getItem(wsKey(ws)) === 'ok') return true;
+    const input = prompt(`작업방 "${ws}" 에 접근하려면 암호를 입력하세요.`);
+    if(input === null) return false;
+    if(input === WS_PASS){
+      sessionStorage.setItem(wsKey(ws), 'ok');
+      return true;
+    }else{
+      alert('암호를 확인해주세요.');
+      return false;
+    }
+  }
+
+  // Workspaces
   async function refreshWorkspaces(){
     let list = await db.workspaces.toArray();
     if(!list.find(w=>w.name===currentWS)){
-      // ensure current exists
       if(list.length===0){ await db.workspaces.put({name:'기본'}); list = await db.workspaces.toArray(); }
       currentWS = list[0]?.name || '기본';
       localStorage.setItem('pnu_current_ws', currentWS);
@@ -209,17 +249,43 @@
   }
 
   wsSelect.addEventListener('change', async (e)=>{
-    currentWS = e.target.value; localStorage.setItem('pnu_current_ws', currentWS); refreshList();
+    const targetWS = e.target.value;
+    const ok = await ensureWorkspaceAuth(targetWS);
+    if(!ok){
+      // 되돌리기
+      wsSelect.value = lastWS;
+      return;
+    }
+    lastWS = targetWS;
+    currentWS = targetWS;
+    localStorage.setItem('pnu_current_ws', currentWS);
+    refreshList();
   });
 
-  // Workspace CRUD buttons
+  // 초기 로드 시 현재 작업방 인증
+  (async function guardInit(){
+    await refreshWorkspaces();
+    const ok = await ensureWorkspaceAuth(currentWS);
+    if(!ok){
+      // 인증 실패 시 다른 작업방 선택 강제는 하지 않고, 다시 시도하도록 유지
+      return;
+    }
+    lastWS = currentWS;
+    refreshList();
+  })();
+
+  // Workspace CRUD (생성/이름변경/삭제)는 원 코드와 동일하되, 진입 시에도 guard 필요
   $('#btnAddWs').addEventListener('click', async ()=>{
     const name = prompt('새 작업방 이름 (예: 서울-종로구, A지구 1공구 등)');
     if(!name) return; const n = name.trim(); if(!n) return;
     const exists = await db.workspaces.get(n);
     if(exists){ alert('같은 이름의 작업방이 이미 있습니다.'); return; }
     await db.workspaces.put({ name:n });
-    currentWS = n; localStorage.setItem('pnu_current_ws', currentWS);
+    await refreshWorkspaces();
+    // 방금 만든 작업방 진입 전 인증
+    const ok = await ensureWorkspaceAuth(n);
+    if(!ok){ return; }
+    currentWS = n; lastWS = n; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces(); await refreshList();
   });
 
@@ -229,7 +295,6 @@
     if(neo===null) return; const n = neo.trim(); if(!n) return;
     if(n===old) return;
     if(await db.workspaces.get(n)){ alert('해당 이름은 이미 존재합니다.'); return; }
-    // 이름 변경: workspace 이름을 변경하면 관련 레코드 키(ws)도 업데이트 필요
     await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
       await db.workspaces.delete(old);
       await db.workspaces.put({ name:n });
@@ -238,7 +303,10 @@
       const sigs = await db.signatures.where('ws').equals(old).toArray();
       for(const s of sigs){ await db.signatures.delete([old, s.pnu]); await db.signatures.put({ ...s, ws:n }); }
     });
-    currentWS = n; localStorage.setItem('pnu_current_ws', currentWS);
+    // 새 이름 인증
+    const ok = await ensureWorkspaceAuth(n);
+    if(!ok){ return; }
+    currentWS = n; lastWS = n; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces(); await refreshList();
   });
 
@@ -254,24 +322,14 @@
       const sigs = await db.signatures.where('ws').equals(name).toArray();
       for(const s of sigs){ await db.signatures.delete([name, s.pnu]); }
     });
-    // switch to another ws
     const remain = await db.workspaces.toArray();
-    currentWS = remain[0].name; localStorage.setItem('pnu_current_ws', currentWS);
+    currentWS = remain[0].name; lastWS = currentWS; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces(); await refreshList();
   });
 
-  // Elements
-  const fileInput = $('#excelFile');
-  const mapBox = $('#mapBox');
-  const mapPnu = $('#mapPnu');
-  const mapOwner = $('#mapOwner');
-  const mapLot = $('#mapLot');
-  const mapNote = $('#mapNote');
-  const btnApplyMap = $('#btnApplyMap');
-  const rowsEl = $('#rows');
-  const qEl = $('#q');
-
-  // File upload handler
+  // ------------------------------
+  // 엑셀 업로드 & 매핑
+  // ------------------------------
   fileInput.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if(!file) return;
@@ -289,10 +347,10 @@
         if(idx>=0){ sel.value = String(idx); break; }
       }
     }
-    fill(mapPnu, ['pnu','필지','고유','parcel']);
+    fill(mapPnu,   ['pnu','필지','고유','parcel']);
     fill(mapOwner, ['소유','owner','성명','이름','대표']);
-    fill(mapLot, ['지번','주소','lot','parcel','address']);
-    fill(mapNote, ['협의','내용','비고','note','memo']);
+    fill(mapLot,   ['지번','주소','lot','parcel','address']);
+    fill(mapNote,  ['협의','내용','비고','note','memo']);
   }
 
   btnApplyMap.addEventListener('click', async () => {
@@ -304,7 +362,6 @@
       note: parseInt(mapNote.value,10)
     };
     if(Number.isNaN(idx.pnu)) { alert('PNU 매핑은 필수입니다.'); return; }
-
     let upserted = 0;
     await db.transaction('rw', db.records, async () => {
       for(const row of excelRows){
@@ -316,7 +373,7 @@
           note: cell(row, idx.note)
         };
         if(!rec.pnu) continue;
-        await db.records.put(rec); // key = [ws, pnu]
+        await db.records.put(rec);
         upserted++;
       }
     });
@@ -326,7 +383,6 @@
     await refreshList();
   });
 
-  // Parse Excel (first sheet)
   async function parseExcel(file){
     const data = await file.arrayBuffer();
     const wb = XLSX.read(data, { type:'array' });
@@ -338,165 +394,244 @@
   function cell(row, idx){ if(Number.isNaN(idx)) return ''; return (row?.[idx] ?? '').toString().trim(); }
   function normalizePnu(v){ if(!v) return ''; return String(v).replace(/\s+/g,'').replace(/[^0-9-]/g,''); }
 
-  // Render list (current workspace only)
+  // ------------------------------
+  // 목록 렌더 (정렬/검색/서명 상태)
+  // ------------------------------
   async function refreshList(){
     const all = await db.records.where('ws').equals(currentWS).toArray();
     const sigs = await db.signatures.where('ws').equals(currentWS).toArray();
     const sigMap = new Map(sigs.map(s => [s.pnu, s]));
 
     const q = currentQuery.trim().toLowerCase();
-    const filtered = q
-      ? all.filter(r => r.pnu.toLowerCase().includes(q) || (r.owner||'').toLowerCase().includes(q) || (r.lot||'').toLowerCase().includes(q))
+    let filtered = q
+      ? all.filter(r =>
+          r.pnu.toLowerCase().includes(q) ||
+          (r.owner||'').toLowerCase().includes(q) ||
+          (r.lot||'').toLowerCase().includes(q)
+        )
       : all;
 
-    filtered.sort((a,b)=> a.pnu.localeCompare(b.pnu));
+    // 정렬
+    if(sortMode==='ownerAsc'){
+      filtered.sort((a,b)=> (a.owner||'').localeCompare(b.owner||'','ko'));
+    }else if(sortMode==='ownerDesc'){
+      filtered.sort((a,b)=> (b.owner||'').localeCompare(a.owner||'','ko'));
+    }else{
+      filtered.sort((a,b)=> a.pnu.localeCompare(b.pnu));
+    }
 
     rowsEl.innerHTML = filtered.map(r => {
       const s = sigMap.get(r.pnu);
       const signed = !!s?.dataUrl;
       const when = s?.signedAt ? new Date(s.signedAt).toLocaleString() : '';
+      const pnuEnc = encodeURIComponent(r.pnu);
       return `<tr>
-        <td><span class="small muted">#</span> ${escapeHtml(r.pnu)}</td>
-        <td>${escapeHtml(r.owner||'')}</td>
-        <td>${escapeHtml(r.lot||'')}</td>
-        <td>${escapeHtml(r.note||'')}</td>
+        <td title="${escapeHtml(r.pnu)}"><span class="small muted">#</span> ${escapeHtml(r.pnu)}</td>
+        <td title="${escapeHtml(r.owner||'')}">${escapeHtml(r.owner||'')}</td>
+        <td title="${escapeHtml(r.lot||'')}">${escapeHtml(r.lot||'')}</td>
+        <td title="${escapeHtml((r.note||'').replace(/\n/g,' '))}">${escapeHtml(r.note||'')}</td>
         <td class="hide-m">${signed?`<span class="pill ok">서명 완료</span><div class="small muted">${escapeHtml(when)}</div>`:`<span class="pill no">미서명</span>`}</td>
         <td>
           <div class="row" style="gap:6px">
-            <button class="btn" onclick="openEdit('${encodeURIComponent(r.pnu)}')">✏️ 수정</button>
-            <button class="btn accent" onclick="openSign('${encodeURIComponent(r.pnu)}')">✍️ 서명</button>
-            <button class="btn" onclick="previewSign('${encodeURIComponent(r.pnu)}')">🖼️ 서명보기</button>
-            <button class="btn danger" onclick="delRec('${encodeURIComponent(r.pnu)}')">🗑️ 삭제</button>
+            <button class="btn btn-edit"    data-pnu="${pnuEnc}">✏️ 협의내용 수정</button>
+            <button class="btn accent btn-sign"   data-pnu="${pnuEnc}">⬆️ 서명 업로드(PNG)</button>
+            <button class="btn btn-preview" data-pnu="${pnuEnc}">🖼️ 서명보기</button>
+            <button class="btn danger btn-del"    data-pnu="${pnuEnc}">🗑️ 삭제</button>
           </div>
         </td>
       </tr>`;
     }).join('');
   }
 
+  // 검색 & 정렬
   qEl.addEventListener('input', (e)=>{ currentQuery = e.target.value; refreshList(); });
+  sortOwnerAscBtn.addEventListener('click', ()=>{ sortMode='ownerAsc'; refreshList(); });
+  sortOwnerDescBtn.addEventListener('click', ()=>{ sortMode='ownerDesc'; refreshList(); });
 
-  // New record
-  $('#btnNew').addEventListener('click', ()=> openEdit(''));
+  // 신규
+  $('#btnNew').addEventListener('click', async ()=>{
+    const pnu = prompt(`[${currentWS}] 신규 PNU (고유키)`);
+    if(pnu===null) return;
+    const key = normalizePnu(pnu);
+    if(!key){ alert('PNU는 필수입니다.'); return; }
+    const owner = prompt('소유자:') ?? '';
+    const lot = prompt('지번:') ?? '';
+    // 협의내용은 아래 모달에서 바로 편집하도록 빈값으로 생성
+    await db.records.put({ ws:currentWS, pnu:key, owner:owner.trim(), lot:lot.trim(), note:'' });
+    // 생성 직후 협의내용 모달 열기
+    openNoteModal(key, '');
+  });
 
-  async function delRec(encPnu){
-    const pnu = decodeURIComponent(encPnu);
-    if(!confirm(`삭제할까요?\n[${currentWS}] PNU: ${pnu}`)) return;
-    await db.transaction('rw', db.records, db.signatures, async () => {
-      await db.records.delete([currentWS, pnu]);
-      await db.signatures.delete([currentWS, pnu]);
-    });
-    refreshList();
-  }
+  // ------------------------------
+  // 이벤트 위임으로 버튼 처리
+  // ------------------------------
+  rowsEl.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const pnu = decodeURIComponent(btn.dataset.pnu || '');
+    if(!pnu) return;
 
-  // Simple edit modal using prompt (빠른 편집)
-  async function openEdit(encPnu){
-    const pnuKey = decodeURIComponent(encPnu);
-    const rec = pnuKey ? (await db.records.get([currentWS, pnuKey])) : { pnu:'', owner:'', lot:'', note:'' };
-    const pPnu = prompt(`[${currentWS}] PNU (고유키):`, rec?.pnu ?? '');
-    if(pPnu===null) return;
-    const pOwner = prompt('소유자:', rec?.owner ?? ''); if(pOwner===null) return;
-    const pLot = prompt('지번:', rec?.lot ?? ''); if(pLot===null) return;
-    const pNote = prompt('협의 내용:', rec?.note ?? ''); if(pNote===null) return;
-
-    const newRec = { ws:currentWS, pnu: normalizePnu(pPnu), owner:pOwner.trim(), lot:pLot.trim(), note:pNote.trim() };
-    if(!newRec.pnu){ alert('PNU는 필수입니다.'); return; }
-
-    if(pnuKey && pnuKey!==newRec.pnu){ // 키 변경 시 기존 삭제
-      await db.records.delete([currentWS, pnuKey]);
-      const sig = await db.signatures.get([currentWS, pnuKey]);
-      if(sig){ await db.signatures.delete([currentWS, pnuKey]); await db.signatures.put({ ws:currentWS, pnu:newRec.pnu, ...sig }); }
+    if(btn.classList.contains('btn-edit')){
+      const rec = await db.records.get([currentWS, pnu]);
+      if(!rec){ alert('레코드를 찾을 수 없습니다.'); return; }
+      openNoteModal(pnu, rec.note || '');
     }
-    await db.records.put(newRec);
-    refreshList();
-  }
+    else if(btn.classList.contains('btn-sign')){
+      openUploadModal(pnu);
+    }
+    else if(btn.classList.contains('btn-preview')){
+      const s = await db.signatures.get([currentWS, pnu]);
+      if(!s?.dataUrl){ alert('서명이 없습니다.'); return; }
+      const win = window.open(); win.document.write(`<img alt="signature" src="${s.dataUrl}">`);
+    }
+    else if(btn.classList.contains('btn-del')){
+      if(!confirm(`삭제할까요?\n[${currentWS}] PNU: ${pnu}`)) return;
+      await db.transaction('rw', db.records, db.signatures, async () => {
+        await db.records.delete([currentWS, pnu]);
+        await db.signatures.delete([currentWS, pnu]);
+      });
+      refreshList();
+    }
+  });
 
-  // Signature Modal (workspace-aware)
-  let sigModal, sigPad, sigCanvas, sigCtx, sigPnu = '';
-  function ensureSignModal(){
-    if(sigModal) return;
-    sigModal = document.createElement('div');
-    sigModal.className = 'modal';
-    sigModal.innerHTML = `
+  // ------------------------------
+  // 협의 내용 수정 모달 (textarea)
+  // ------------------------------
+  let noteModal, noteTextarea, noteSaveBtn, noteCloseBtn, notePnuLabel, notePnu='';
+  function ensureNoteModal(){
+    if(noteModal) return;
+    noteModal = document.createElement('div');
+    noteModal.className = 'modal';
+    noteModal.innerHTML = `
       <div class="sheet">
         <div class="row" style="align-items:center">
-          <h3 style="margin:0">전자 서명</h3>
+          <h3 style="margin:0">협의 내용 수정</h3>
           <span class="right"></span>
-          <button class="btn" id="btnCloseSign">닫기</button>
+          <button class="btn" id="btnCloseNote">닫기</button>
         </div>
-        <div class="help" id="signTarget" style="margin:6px 0 10px"></div>
-        <canvas id="sigCanvas" width="1024" height="512"></canvas>
+        <div class="help" id="noteTarget" style="margin:6px 0 10px"></div>
+        <textarea id="noteTextarea" rows="8" placeholder="협의 내용을 입력하세요(줄바꿈 가능)"></textarea>
         <div class="row" style="margin-top:10px">
-          <button class="btn" id="btnClearSig">지우기</button>
-          <button class="btn brand" id="btnSaveSig">서명 저장</button>
+          <button class="btn brand" id="btnSaveNote">저장</button>
         </div>
-        <div class="help">손가락/펜으로 서명해 주세요. 저장 시 이미지가 로컬 DB에 암호화 없이 저장됩니다.</div>
       </div>`;
-    document.body.appendChild(sigModal);
+    document.body.appendChild(noteModal);
+    noteTextarea = noteModal.querySelector('#noteTextarea');
+    noteSaveBtn = noteModal.querySelector('#btnSaveNote');
+    noteCloseBtn = noteModal.querySelector('#btnCloseNote');
+    notePnuLabel = noteModal.querySelector('#noteTarget');
 
-    sigCanvas = sigModal.querySelector('#sigCanvas');
-    sigCtx = sigCanvas.getContext('2d');
-    sigPad = new SignaturePad.SignaturePad(sigCanvas, { backgroundColor: 'white', penColor: 'black' });
-
-    sigModal.querySelector('#btnCloseSign').addEventListener('click', ()=> closeSign());
-    sigModal.querySelector('#btnClearSig').addEventListener('click', ()=> sigPad.clear());
-    sigModal.querySelector('#btnSaveSig').addEventListener('click', saveSignature);
-
-    const resizeCanvas = () => {
-      const ratio = Math.max(window.devicePixelRatio || 1, 1);
-      const rect = sigCanvas.getBoundingClientRect();
-      sigCanvas.width = rect.width * ratio; sigCanvas.height = rect.height * ratio; sigCtx.scale(ratio, ratio); sigPad.clear();
-    };
-    const ro = new ResizeObserver(resizeCanvas); ro.observe(sigCanvas);
+    noteCloseBtn.addEventListener('click', ()=> noteModal.classList.remove('open'));
+    noteSaveBtn.addEventListener('click', async ()=>{
+      const rec = await db.records.get([currentWS, notePnu]);
+      if(!rec){ alert('레코드를 찾을 수 없습니다.'); return; }
+      await db.records.put({ ...rec, note: noteTextarea.value.trim() });
+      noteModal.classList.remove('open');
+      refreshList();
+    });
+  }
+  function openNoteModal(pnu, note){
+    ensureNoteModal();
+    notePnu = pnu;
+    notePnuLabel.textContent = `[${currentWS}] PNU ${pnu}`;
+    noteTextarea.value = note || '';
+    noteModal.classList.add('open');
+    noteTextarea.focus();
   }
 
-  window.openSign = async (encPnu) => {
-    ensureSignModal();
-    sigPnu = decodeURIComponent(encPnu);
-    const rec = await db.records.get([currentWS, sigPnu]);
-    if(!rec){ alert('레코드가 없습니다.'); return; }
-    sigModal.querySelector('#signTarget').textContent = `[${currentWS}] PNU ${rec.pnu} · ${rec.owner||''} · ${rec.lot||''}`;
-    sigPad.clear();
-    const existing = await db.signatures.get([currentWS, sigPnu]);
-    if(existing?.dataUrl){
-      const img = new Image(); img.onload = ()=>{ const c = sigCanvas; const ctx = c.getContext('2d'); ctx.globalAlpha = 0.18; ctx.drawImage(img, 0, 0, c.width, c.height); ctx.globalAlpha = 1; };
-      img.src = existing.dataUrl;
-    }
-    sigModal.classList.add('open');
+  // ------------------------------
+  // 서명 업로드 모달 (PNG)
+  // ------------------------------
+  let upModal, upFile, upSaveBtn, upCloseBtn, upPnuLabel, upPreviewImg, upPnu='';
+  function ensureUploadModal(){
+    if(upModal) return;
+    upModal = document.createElement('div');
+    upModal.className = 'modal';
+    upModal.innerHTML = `
+      <div class="sheet">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">서명 업로드 (PNG)</h3>
+          <span class="right"></span>
+          <button class="btn" id="btnCloseUpload">닫기</button>
+        </div>
+        <div class="help" id="upTarget" style="margin:6px 0 10px"></div>
+        <input id="upFile" type="file" accept="image/png">
+        <div class="help" style="margin-top:8px">※ PNG만 허용됩니다. 업로드 시 로컬 DB에 Data URL로 저장됩니다.</div>
+        <div style="margin-top:10px"><img id="upPreview" alt="미리보기" style="max-width:100%;border-radius:8px;display:none"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn brand" id="btnSaveUpload">저장</button>
+        </div>
+      </div>`;
+    document.body.appendChild(upModal);
+    upFile = upModal.querySelector('#upFile');
+    upSaveBtn = upModal.querySelector('#btnSaveUpload');
+    upCloseBtn = upModal.querySelector('#btnCloseUpload');
+    upPnuLabel = upModal.querySelector('#upTarget');
+    upPreviewImg = upModal.querySelector('#upPreview');
+
+    upCloseBtn.addEventListener('click', ()=> upModal.classList.remove('open'));
+    upFile.addEventListener('change', ()=>{
+      const f = upFile.files?.[0];
+      if(!f){ upPreviewImg.style.display='none'; return; }
+      if(f.type !== 'image/png'){ alert('PNG 형식만 업로드 가능합니다.'); upFile.value=''; upPreviewImg.style.display='none'; return; }
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        upPreviewImg.src = ev.target.result;
+        upPreviewImg.style.display = 'block';
+      };
+      reader.readAsDataURL(f);
+    });
+    upSaveBtn.addEventListener('click', async ()=>{
+      const f = upFile.files?.[0];
+      if(!f){ alert('파일을 선택해 주세요.'); return; }
+      if(f.type !== 'image/png'){ alert('PNG 형식만 업로드 가능합니다.'); return; }
+      const dataUrl = upPreviewImg.src;
+      await db.signatures.put({ ws:currentWS, pnu: upPnu, dataUrl, signedAt: new Date().toISOString() });
+      upModal.classList.remove('open');
+      upFile.value=''; upPreviewImg.style.display='none';
+      refreshList();
+    });
   }
-  function closeSign(){ sigModal?.classList.remove('open'); }
-  async function saveSignature(){
-    if(sigPad.isEmpty()){ alert('서명이 비어 있습니다.'); return; }
-    const dataUrl = sigPad.toDataURL('image/png');
-    await db.signatures.put({ ws:currentWS, pnu: sigPnu, dataUrl, signedAt: new Date().toISOString() });
-    closeSign(); refreshList();
-  }
-  window.previewSign = async (encPnu) => {
-    const pnu = decodeURIComponent(encPnu);
-    const s = await db.signatures.get([currentWS, pnu]);
-    if(!s?.dataUrl){ alert('서명이 없습니다.'); return; }
-    const win = window.open(); win.document.write(`<img alt="signature" src="${s.dataUrl}">`);
+  async function openUploadModal(pnu){
+    ensureUploadModal();
+    upPnu = pnu;
+    const rec = await db.records.get([currentWS, upPnu]);
+    if(!rec){ alert('레코드를 찾을 수 없습니다.'); return; }
+    upPnuLabel.textContent = `[${currentWS}] PNU ${rec.pnu} · ${rec.owner||''} · ${rec.lot||''}`;
+    upModal.classList.add('open');
   }
 
-  // Export: XLSX (현재 작업방만)
+  // ------------------------------
+  // Export/Import/Template/Reset
+  // ------------------------------
   $('#btnExportXlsx').addEventListener('click', async ()=>{
+    // SheetJS(커뮤니티 빌드)는 셀에 '이미지 삽입' 기능이 공식 지원되지 않습니다.
+    // 대신 Data URL(서명 PNG)을 텍스트로 셀에 포함시킵니다.
     const recs = await db.records.where('ws').equals(currentWS).toArray();
-    const sigs = new Map((await db.signatures.where('ws').equals(currentWS).toArray()).map(s => [s.pnu, s]));
-    const rows = recs.map(r=>({
-      작업방: currentWS,
-      PNU: r.pnu,
-      소유자: r.owner||'',
-      지번: r.lot||'',
-      협의내용: r.note||'',
-      서명여부: sigs.has(r.pnu) ? 'Y' : 'N',
-      서명시각: sigs.get(r.pnu)?.signedAt ? new Date(sigs.get(r.pnu).signedAt).toLocaleString() : ''
-    }));
+    const sigMap = new Map((await db.signatures.where('ws').equals(currentWS).toArray()).map(s => [s.pnu, s]));
+    const rows = recs.map(r=>{
+      const sig = sigMap.get(r.pnu);
+      return {
+        작업방: currentWS,
+        PNU: r.pnu,
+        소유자: r.owner||'',
+        지번: r.lot||'',
+        협의내용: r.note||'',
+        서명여부: sig ? 'Y' : 'N',
+        서명시각: sig?.signedAt ? new Date(sig.signedAt).toLocaleString() : '',
+        서명PNG_DataURL: sig?.dataUrl || ''  // Data URL로 내보냄
+      };
+    });
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows);
+    // 열 너비 살짝 넓게
+    ws['!cols'] = [
+      {wch:12},{wch:20},{wch:12},{wch:18},{wch:40},{wch:8},{wch:20},{wch:50}
+    ];
     XLSX.utils.book_append_sheet(wb, ws, currentWS.slice(0,31));
     XLSX.writeFile(wb, `pnu_${sanitizeFile(currentWS)}_${fmtDate()}.xlsx`);
   });
 
-  // Export/Import JSON (전체 DB)
   $('#btnExportJson').addEventListener('click', async ()=>{
     const payload = {
       exportedAt: new Date().toISOString(),
@@ -522,7 +657,6 @@
     await refreshWorkspaces(); alert('복원 완료'); refreshList();
   });
 
-  // Template xlsx (작업방 무관)
   $('#btnTemplate').addEventListener('click', ()=>{
     const wb = XLSX.utils.book_new();
     const rows = [ { PNU:'1111010100100000000', 소유자:'홍길동', 지번:'서울 종로구 1-1', 협의내용:'보상 협의 1차 완료' } ];
@@ -530,11 +664,12 @@
     XLSX.writeFile(wb, 'pnu_template.xlsx');
   });
 
-  // Reset DB (모든 작업방 포함 전부 삭제)
   $('#btnReset').addEventListener('click', async ()=>{
     if(!confirm('DB를 초기화할까요? 모든 작업방의 레코드/서명이 삭제됩니다.')) return;
-    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{ await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear(); });
-    await db.workspaces.put({ name:'기본' }); currentWS='기본'; localStorage.setItem('pnu_current_ws', currentWS);
+    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
+      await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear();
+    });
+    await db.workspaces.put({ name:'기본' }); currentWS='기본'; lastWS='기본'; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces(); refreshList();
   });
 
@@ -544,8 +679,7 @@
   function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
   function sanitizeFile(s){ return s.replace(/[^\w\-가-힣]/g,'_').slice(0,60); }
 
-  // Kick
-  (async function init(){ await refreshWorkspaces(); await refreshList(); })();
+  // Excel 유틸 끝
   </script>
 </body>
 </html>
