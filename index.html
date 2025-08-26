@@ -189,118 +189,210 @@
   window.db = db;
   </script>
 
-  <!-- 2) Firebase 초기화 (CDN 모듈) -->
-  <script type="module" id="firebase-init">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+  <!-- 2) Firebase 초기화 (CDN 모듈, 익명 로그인 + 멤버 자동생성) -->
+<script type="module" id="firebase-init">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+  import { initializeFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDh8dyrAbshk0npKTxzAdaX3_426txbRpI",
-      authDomain: "jajosa-8d811.firebaseapp.com",
-      projectId: "jajosa-8d811",
-      storageBucket: "jajosa-8d811.appspot.com",
-      messagingSenderId: "616881022512",
-      appId: "1:616881022512:web:cf3b8c32f4535bb65aff5",
-      measurementId: "G-9J5C7KHZCG"
-    };
+  // 🔧 프로젝트 문서 ID (규칙과 맞춤) — 원하면 바꾸세요
+  const PROJECT_ID = 'default';
+  window.__PROJECT_ID = PROJECT_ID;
 
-    const app = initializeApp(firebaseConfig);
-    const fdb = getFirestore(app);
-    window.__fdb = fdb;
-  </script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDh8dyrAbshk0npKTxZAdaX3_426txbRpI",
+    authDomain: "jajosa-8d811.firebaseapp.com",
+    projectId: "jajosa-8d811",
+    storageBucket: "jajosa-8d811.firebasestorage.app",
+    messagingSenderId: "616881022512",
+    appId: "1:616881022512:web:cf3b8c32f4535bb65a6ff5",
+    measurementId: "G-9J5C7KHCZG"
+  };
+
+  const app = initializeApp(firebaseConfig);
+
+  // ⚙️ WebChannel 차단 환경 대응
+  const fdb = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+    useFetchStreams: false
+  });
+  window.__fdb = fdb;
+
+  // ✅ 익명 로그인 + 멤버 자동 생성(테스트: admin 부여)
+  const auth = getAuth(app);
+  window.__authReady = new Promise((resolve, reject) => {
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          const mref = doc(fdb, `projects/${PROJECT_ID}/members/${user.uid}`);
+          const snap = await getDoc(mref);
+          if (!snap.exists()) {
+            await setDoc(mref, { role: 'admin', createdAt: new Date().toISOString() });
+          }
+        } catch(e) {
+          console.warn('[members bootstrap] 실패:', e);
+        }
+      }
+      resolve();
+    }, reject);
+  });
+  signInAnonymously(auth).catch((e)=>console.warn('[auth] signInAnonymously 실패', e));
+</script>
 
   <!-- 3) 동기화 헬퍼(IndexedDB ↔ Firestore) -->
   <script type="module">
-    import {
-      doc, setDoc, collection, query, where, onSnapshot, deleteDoc
-    } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+  import {
+    doc, setDoc, collection, query, where, onSnapshot, deleteDoc, getDocs,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-    const fdb = window.__fdb;
-    const db = window.db;
+  const fdb = window.__fdb;
+  const db  = window.db;
+  const PROJECT_ID = window.__PROJECT_ID || 'default';
 
-    let applyingRemote = false;
-    const safeId = (s) => String(s ?? '').replaceAll('/', '_');
-    const docId = (ws, pnu) => `${safeId(ws)}__${safeId(pnu)}`;
+  // 문서ID 안전화(슬래시 등 제거)
+  const safeId = (s)=> String(s ?? '').replaceAll('/', '_');
 
-    async function upsertRecordLocalFirst(rec){
-      const now = Date.now();
-      const withTs = { ...rec, updatedAtMs: now };
-      await db.records.put(withTs);
-      if (applyingRemote) return;
-      try {
-        await setDoc(doc(fdb, "records", docId(rec.ws, rec.pnu)), withTs, { merge:true });
-        } catch (e) {
-          console.warn('[records.setDoc] 실패', docId(rec.ws, rec.pnu), e);
-      }
+  // 규칙 경로에 맞춘 ref 헬퍼
+  const pnuCol  = () => collection(fdb, `projects/${PROJECT_ID}/pnu`);
+  const signCol = () => collection(fdb, `projects/${PROJECT_ID}/signatures`);
+  const pnuDocRef  = (ws, pnu) => doc(fdb, `projects/${PROJECT_ID}/pnu/${safeId(ws)}__${safeId(pnu)}`);
+  const signDocRef = (ws, pnu) => doc(fdb, `projects/${PROJECT_ID}/signatures/${safeId(ws)}__${safeId(pnu)}`);
+
+  let applyingRemote = false;
+
+  // ▶ 레코드 업서트: 로컬 저장 후, 규칙 스키마(pnu/owner/address/content/updatedAt)로 푸시
+  async function upsertRecordLocalFirst(rec){
+    const now = Date.now();
+    const local = { ...rec, updatedAtMs: now };
+    await db.records.put(local);
+
+    if (applyingRemote) return;
+
+    // ※ 규칙에서 pnu는 string 으로 변경 권장 (pnu is string)
+    const remote = {
+      pnu: String(rec.pnu),
+      owner: rec.owner || '',
+      address: rec.lot || '',
+      content: rec.note || '',
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      await setDoc(pnuDocRef(rec.ws, rec.pnu), remote, { merge:true });
+    } catch (e) {
+      console.warn('[pnu.setDoc] 실패', e);
     }
-    async function upsertSignatureLocalFirst(ws, pnu, dataUrl, signedAtISO=null){
-      const now = Date.now();
-      const payload = { ws, pnu, dataUrl, signedAt: signedAtISO || new Date().toISOString(), updatedAtMs: now };
-      await db.signatures.put(payload);
-      if (applyingRemote) return;
-      try {
-        await setDoc(doc(fdb, "signatures", docId(ws, pnu)), payload, { merge:true });
-        } catch (e) {
-          console.error('[signatures.setDoc] 실패', docId(ws, pnu), e);
-      }
-    }
-    async function deleteRecordAndSignatureLocalFirst(ws, pnu){
-      await db.transaction('rw', db.records, db.signatures, async ()=>{
-        await db.records.delete([ws,pnu]);
-        await db.signatures.delete([ws,pnu]);
-      });
-      if (applyingRemote) return;
-      try { await deleteDoc(doc(fdb, "records", docId(ws, pnu))); } catch(e){ console.warn('[records.deleteDoc] 실패', e); }
-      try { await deleteDoc(doc(fdb, "signatures", docId(ws, pnu))); } catch(e){ console.warn('[signatures.deleteDoc] 실패', e); }
-    }
+  }
 
-    let unsubRecords=null, unsubSignatures=null;
-    function stopCloudWatch(){ unsubRecords?.(); unsubRecords=null; unsubSignatures?.(); unsubSignatures=null; }
+  // ▶ 서명 업서트: 로컬 저장 후, 규칙 스키마(signatureUrl/updatedAt + userId)로 푸시
+  async function upsertSignatureLocalFirst(ws, pnu, dataUrl, signedAtISO=null){
+    const now = Date.now();
+    await db.signatures.put({ ws, pnu, dataUrl, signedAt: signedAtISO || new Date().toISOString(), updatedAtMs: now });
 
-    function startCloudWatch(wsName){
-      stopCloudWatch();
-      unsubRecords = onSnapshot(
-        query(collection(fdb, "records"), where("ws","==",wsName)),
-        async snap=>{
-          applyingRemote = true;
-          try{
-            for(const ch of snap.docChanges()){
-              const data = ch.doc.data();
-              if(!data?.pnu) continue;
-              const local = await db.records.get([wsName, data.pnu]);
-              if(!local || (data.updatedAtMs??0) > (local.updatedAtMs??0)){
-                await db.records.put(data);
-              }
-            }
-          } finally {
-            applyingRemote = false;
-            window.refreshList?.();
+    if (applyingRemote) return;
+
+    // userId는 규칙에서 create 시 본인만 허용에 필요
+    const { getAuth } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
+    const uid = getAuth().currentUser?.uid || 'unknown';
+    const remote = {
+      userId: uid,
+      ws, pnu,
+      signatureUrl: dataUrl,
+      updatedAt: serverTimestamp()
+    };
+
+    try {
+      await setDoc(signDocRef(ws, pnu), remote, { merge:true });
+    } catch (e) {
+      console.warn('[sign.setDoc] 실패', e);
+    }
+  }
+
+  // ▶ 삭제
+  async function deleteRecordAndSignatureLocalFirst(ws, pnu){
+    await db.transaction('rw', db.records, db.signatures, async ()=>{
+      await db.records.delete([ws,pnu]);
+      await db.signatures.delete([ws,pnu]);
+    });
+    if (applyingRemote) return;
+    try { await deleteDoc(pnuDocRef(ws, pnu)); }  catch(e){ console.warn('[pnu.delete] 실패', e); }
+    try { await deleteDoc(signDocRef(ws, pnu)); } catch(e){ console.warn('[sign.delete] 실패', e); }
+  }
+
+  // ▶ 실시간 수신(규칙 경로)
+  let unsubRecords=null, unsubSignatures=null;
+  function stopCloudWatch(){ unsubRecords?.(); unsubRecords=null; unsubSignatures?.(); unsubSignatures=null; }
+
+  function startCloudWatch(wsName){
+    stopCloudWatch();
+
+    // records → 로컬 반영
+    unsubRecords = onSnapshot(
+      // 필요시 where('ws','==',wsName)로 좁힐 수도 있음. (지금은 프로젝트 전체 수신)
+      query(pnuCol()),
+      async snap=>{
+        applyingRemote = true;
+        try{
+          for(const ch of snap.docChanges()){
+            const data = ch.doc.data();
+            // 규칙 스키마 → 로컬 스키마 매핑
+            const r = {
+              ws: wsName,                         // 프로젝트 단위 컬렉션이므로 wsName 기준으로 필터링할 수도 있음
+              pnu: String(data.pnu || ''),
+              owner: data.owner || '',
+              lot: data.address || '',
+              note: data.content || '',
+              updatedAtMs: Date.now()
+            };
+            if (!r.pnu) continue;
+            // 현재 작업방에 해당하는 문서만 반영하고 싶으면 조건 추가:
+            // if (!ch.doc.id.startsWith(safeId(wsName)+'__')) continue;
+            await db.records.put(r);
           }
+        } finally {
+          applyingRemote = false;
+          window.refreshList?.();
         }
-      );
-      unsubSignatures = onSnapshot(
-        query(collection(fdb, "signatures"), where("ws","==",wsName)),
-        async snap=>{
-          applyingRemote = true;
-          try{
-            for(const ch of snap.docChanges()){
-              const data = ch.doc.data();
-              if(!data?.pnu) continue;
-              const local = await db.signatures.get([wsName, data.pnu]);
-              if(!local || (data.updatedAtMs??0) > (local.updatedAtMs??0)){
-                await db.signatures.put(data);
-              }
-            }
-          } finally {
-            applyingRemote = false;
-            window.refreshList?.();
-          }
-        }
-      );
-    }
+      }
+    );
 
-    window.SyncAPI = { upsertRecordLocalFirst, upsertSignatureLocalFirst, deleteRecordAndSignatureLocalFirst, startCloudWatch, stopCloudWatch };
-  </script>
+    // signatures → 로컬 반영
+    unsubSignatures = onSnapshot(
+      query(signCol()),
+      async snap=>{
+        applyingRemote = true;
+        try{
+          for(const ch of snap.docChanges()){
+            const d = ch.doc.data();
+            const key = ch.doc.id.split('__')[1] || ''; // id = ws__pnu
+            if (!key) continue;
+            // 현재 작업방만 반영하려면 아래 조건 추가:
+            // if (!ch.doc.id.startsWith(safeId(wsName)+'__')) continue;
+            await db.signatures.put({
+              ws: wsName,
+              pnu: key,
+              dataUrl: d.signatureUrl || '',
+              signedAt: d.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+              updatedAtMs: Date.now()
+            });
+          }
+        } finally {
+          applyingRemote = false;
+          window.refreshList?.();
+        }
+      }
+    );
+  }
+
+  window.SyncAPI = {
+    upsertRecordLocalFirst,
+    upsertSignatureLocalFirst,
+    deleteRecordAndSignatureLocalFirst,
+    startCloudWatch,
+    stopCloudWatch
+  };
+</script>
 
   <!-- 4) 앱 로직(UI/CRUD/서명/엑셀) -->
   <script>
@@ -468,7 +560,7 @@
   allJustSaved.forEach(r=>{
     window.SyncAPI?.upsertRecordLocalFirst(r);
   });
-  
+
     alert(`(${currentWS}) ${upserted.toLocaleString()}건 저장/갱신`);
     mapBox.style.display='none'; fileInput.value=''; refreshList();
   });
