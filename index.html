@@ -187,27 +187,28 @@
     const sigs = await tx.table('signatures').toArray().catch(()=>[]);
     for (const s of sigs) { if (typeof s.updatedAtMs !== 'number') { s.updatedAtMs = now; await tx.table('signatures').put(s); } }
   });
-  window.db = db; /* 전역 노출 */
+  window.db = db;
   </script>
 
-  <!-- 2) Firebase 초기화 (CDN 모듈, 익명 로그인 + 멤버 자동생성) -->
+  <!-- 2) Firebase 초기화 -->
   <script type="module" id="firebase-init">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
     import { initializeFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
+    // >>> 본인 Firebase 콘솔의 Web 구성으로 교체하세요 <<<
+    const firebaseConfig = {
+      apiKey: "YOUR_WEB_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "XXXXXXXXXXXX",
+      appId: "1:XXXXXXXXXXXX:web:XXXXXXXXXXXXXXXXXXXX",
+      measurementId: "G-XXXXXXXXXX"
+    };
+
     const PROJECT_ID = 'default';
     window.__PROJECT_ID = PROJECT_ID;
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyDh8dyrAbshk0npKTxzAdaX3_426txbRpI",
-      authDomain: "jajosa-8d811.firebaseapp.com",
-      projectId: "jajosa-8d811",
-      storageBucket: "jajosa-8d811.appspot.com",
-      messagingSenderId: "616881022512",
-      appId: "1:616881022512:web:cf3b8c32f4535bb65aff5",
-      measurementId: "G-9J5C7KHZCG"
-    };
 
     const app = initializeApp(firebaseConfig);
     const fdb = initializeFirestore(app, {
@@ -246,9 +247,10 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-    const fdbRef = window.__fdb;                   <!-- ★ CHANGED: 전역 재선언 방지 -->
-    const dbRef  = window.db;                      <!-- ★ CHANGED: 전역 재선언 방지 -->
-    const PROJECT_ID = window.__PROJECT_ID || 'default'; <!-- ★ CHANGED: 전역 재선언 방지 -->
+    // CHANGED: 전역 재선언 방지
+    const fdbRef = window.__fdb;
+    const dbRef  = window.db;
+    const PROJECT_ID = window.__PROJECT_ID || 'default';
 
     const safeId = (s)=> String(s ?? '').replaceAll('/', '_');
 
@@ -310,8 +312,8 @@
           for(const ch of snap.docChanges()){
             const data = ch.doc.data();
             const [idWs, idPnu] = (ch.doc.id.split('__')||[]);
-            if (!idWs || !idPnu) continue;                     <!-- ★ CHANGED: id로 ws/pnu 확보 -->
-            if (idWs !== safeId(wsName)) continue;             <!-- ★ CHANGED: 현재 작업방만 반영 -->
+            if (!idWs || !idPnu) continue;
+            if (idWs !== safeId(wsName)) continue; // 현재 작업방만 반영
             const r = {
               ws: wsName,
               pnu: String(data.pnu || idPnu),
@@ -335,7 +337,7 @@
           for(const ch of snap.docChanges()){
             const [idWs, idPnu] = (ch.doc.id.split('__')||[]);
             if (!idWs || !idPnu) continue;
-            if (idWs !== safeId(wsName)) continue;             <!-- ★ CHANGED: 현재 작업방만 반영 -->
+            if (idWs !== safeId(wsName)) continue; // 현재 작업방만 반영
             const d = ch.doc.data();
             await dbRef.signatures.put({
               ws: wsName,
@@ -363,7 +365,6 @@
 
   <!-- 4) 앱 로직(UI/CRUD/서명/엑셀) -->
   <script>
-  /* (구형 브라우저 폴백) */
   window.ResizeObserver = window.ResizeObserver || class { constructor(){ } observe(){ } unobserve(){ } disconnect(){ } };
 
   const $ = s=>document.querySelector(s);
@@ -375,7 +376,6 @@
   let excelHeaders=[], excelRows=[], currentQuery='', sortMode='pnu';
   let currentWS=localStorage.getItem('pnu_current_ws')||'기본', lastWS=currentWS;
 
-  // ✅ 작업방 접근 암호
   const WS_PASS="lx전북재조사추진단";
   function wsKey(ws){ return `ws_authed_${ws}`; }
   async function ensureWorkspaceAuth(ws){
@@ -386,7 +386,6 @@
     alert('암호를 확인해주세요.'); return false;
   }
 
-  // --- 동기화 준비 대기 ---
   function whenSyncReady(timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
       const start = Date.now();
@@ -416,7 +415,6 @@
     wsSelect.innerHTML = list.map(w=>`<option ${w.name===currentWS?'selected':''} value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
   }
 
-  // 작업방 변경 시
   wsSelect.addEventListener('change', async (e)=>{
     const targetWS=e.target.value;
     const ok=await ensureWorkspaceAuth(targetWS);
@@ -426,7 +424,6 @@
     refreshList();
   });
 
-  // 초기 가드 + 워치 시작
   window.addEventListener('load', async () => {
     try {
       await refreshWorkspaces();
@@ -441,7 +438,6 @@
     }
   });
 
-  // 작업방 추가
   $('#btnAddWs').addEventListener('click', async ()=>{
     const name=prompt('새 작업방 이름'); if(!name) return;
     const n=name.trim(); if(!n) return;
@@ -455,7 +451,6 @@
     await refreshList();
   });
 
-  // 작업방 이름 변경
   $('#btnRenameWs').addEventListener('click', async ()=>{
     const old=currentWS; const neo=prompt(`작업방 이름 변경: ${old} →`, old);
     if(neo===null) return; const n=neo.trim(); if(!n||n===old) return;
@@ -470,11 +465,10 @@
     const ok=await ensureWorkspaceAuth(n); if(!ok) return;
     currentWS=n; lastWS=n; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces();
-    await startWsWatch(currentWS);           /* ★ CHANGED: 오타 수정 (currentsWs → currentWS) */
+    await startWsWatch(currentWS); // 오타 수정
     await refreshList();
   });
 
-  // 작업방 삭제
   $('#btnDelWs').addEventListener('click', async ()=>{
     const name=currentWS; const list=await db.workspaces.toArray();
     if(list.length<=1){ alert('최소 1개 작업방 필요'); return; }
@@ -494,13 +488,11 @@
     await refreshList();
   });
 
-  // 작업방 잠금
   $('#btnLockWs').addEventListener('click', ()=>{
     sessionStorage.removeItem(wsKey(currentWS));
     alert('이 작업방의 인증이 초기화되었습니다. 다시 접근 시 암호가 필요합니다.');
   });
 
-  // 엑셀 업로드(매핑)
   fileInput.addEventListener('change', async e=>{
     const f=e.target.files?.[0]; if(!f) return;
     const {headers,rows}=await parseExcel(f);
@@ -531,7 +523,6 @@
       }
     });
 
-    // 동기화 업서트
     const allJustSaved = await db.records.where('ws').equals(currentWS).toArray();
     allJustSaved.forEach(r=>{
       window.SyncAPI?.upsertRecordLocalFirst(r);
@@ -550,7 +541,6 @@
   function cell(row, idx){ if(Number.isNaN(idx)) return ''; return (row?.[idx]??'').toString().trim(); }
   function normalizePnu(v){ if(!v) return ''; return String(v).replace(/\s+/g,'').replace(/[^0-9-]/g,''); }
 
-  // 검색/정렬
   qEl.addEventListener('input', e=>{ currentQuery=e.target.value; refreshList(); });
   sortOwnerAscBtn.addEventListener('click', ()=>{ sortMode='ownerAsc'; refreshList(); });
   sortOwnerDescBtn.addEventListener('click', ()=>{ sortMode='ownerDesc'; refreshList(); });
@@ -592,7 +582,6 @@
   }
   window.refreshList = refreshList;
 
-  // 신규 추가
   $('#btnNew').addEventListener('click', async ()=>{
     const pnu=prompt(`[${currentWS}] 신규 PNU(고유키)`); if(pnu===null) return;
     const key=normalizePnu(pnu); if(!key){ alert('PNU는 필수'); return; }
@@ -601,7 +590,6 @@
     openNoteModal(key,'');
   });
 
-  // 행 버튼들
   rowsEl.addEventListener('click', async e=>{
     const btn=e.target.closest('button'); if(!btn) return;
     const pnu=decodeURIComponent(btn.dataset.pnu||''); if(!pnu) return;
@@ -701,7 +689,6 @@
       reader.onload=ev=>{ upPreview.src=ev.target.result; upPreview.style.display='block'; };
       reader.readAsDataURL(f);
     });
-    // UMD 전역 사용
     drawPad = new window.SignaturePad(drawCanvas, { backgroundColor:'white', penColor:'black' });
     clearDrawBtn.addEventListener('click', ()=> drawPad.clear());
     closeSigBtn.addEventListener('click', ()=> sigModal.classList.remove('open'));
@@ -775,7 +762,6 @@
     saveAs(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `pnu_${sanitizeFile(currentWS)}_${fmtDate()}.xlsx`);
   });
 
-  // JSON 백업/복원/템플릿/리셋
   $('#btnExportJson').addEventListener('click', async ()=>{
     const payload={ exportedAt:new Date().toISOString(), workspaces:await db.workspaces.toArray(), records:await db.records.toArray(), signatures:await db.signatures.toArray() };
     downloadBlob(new Blob([JSON.stringify(payload,null,2)], {type:'application/json'}), `pnu_backup_all_${fmtDate()}.json`);
@@ -787,11 +773,11 @@
     if(!Array.isArray(data.records)||!Array.isArray(data.signatures)) { alert('백업 형식이 올바르지 않습니다.'); return; }
     await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
       await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear();
-      const wsList=data.workspaces?.length?data.workspaces:[{name:'기본'}];
-      for(const w of wsList) await db.workspaces.put({name:w.name});
-      for(const r of data.records) await db.records.put(r);
-      for(const s of data.signatures) await db.signatures.put(s);
     });
+    const wsList=data.workspaces?.length?data.workspaces:[{name:'기본'}];
+    for(const w of wsList) await db.workspaces.put({name:w.name});
+    for(const r of data.records) await db.records.put(r);
+    for(const s of data.signatures) await db.signatures.put(s);
     await refreshWorkspaces(); alert('복원 완료'); refreshList();
   });
   $('#btnTemplate').addEventListener('click', ()=>{
