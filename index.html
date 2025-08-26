@@ -193,7 +193,7 @@
 <!-- 2) Firebase 초기화 (CDN 모듈, 익명 로그인 + 멤버 자동생성) -->
 <script type="module" id="firebase-init">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-  import { initializeFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+  import { initializeFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
   const PROJECT_ID = 'default';
@@ -217,6 +217,18 @@
   window.__fdb = fdb;
 
   const auth = getAuth(app);
+
+    // ✅ 멤버 문서 보장 함수 (없으면 생성)
+  async function ensureMember() {
+    const user = auth.currentUser;
+    if (!user) return; // 아직 로그인 전
+    const mref = doc(fdb, `projects/${PROJECT_ID}/members/${user.uid}`);
+    const snap = await getDoc(mref);
+    if (!snap.exists()) {
+      await setDoc(mref, { role: 'admin', createdAt: new Date().toISOString() });
+    }
+  }
+  window.__ensureMember = ensureMember;
   window.__authReady = new Promise((resolve, reject) => {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -431,6 +443,14 @@
     });
   }
 
+ // ✅ onSnapshot 열기 전에: (1) 로그인 완료 대기 (2) 멤버 문서 보장
+  async function startWsWatch(ws) {
+    if (window.__authReady)    await window.__authReady;
+    if (window.__ensureMember) await window.__ensureMember();
+    await startWsWatch(currents)
+    refreshList();
+  }
+
   async function refreshWorkspaces(){
     let list = await db.workspaces.toArray();
     if(!list.find(w=>w.name===currentWS)){
@@ -453,12 +473,11 @@
   // 초기 가드 + 워치 시작
   (async function guardInit(){
     try {
-      await whenSyncReady();                 // ✅ SyncAPI 준비 대기
       await refreshWorkspaces();
       const ok = await ensureWorkspaceAuth(currentWS);
       if(!ok) return;
       lastWS = currentWS;
-      window.SyncAPI.startCloudWatch(currentWS);
+      await startWsWatch(currents);
       refreshList();
     } catch (e) {
       console.error('[init] SyncAPI not ready:', e);
@@ -493,8 +512,7 @@
     const ok=await ensureWorkspaceAuth(n); if(!ok) return;
     currentWS=n; lastWS=n; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces();
-    await whenSyncReady();
-    window.SyncAPI.startCloudWatch(currentWS);
+    await startWsWatch(currentsWs);
     await refreshList();
   });
 
