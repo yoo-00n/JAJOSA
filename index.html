@@ -230,8 +230,7 @@
       try {
         await setDoc(doc(fdb, "records", docId(rec.ws, rec.pnu)), withTs, { merge:true });
         } catch (e) {
-          console.error('[records.setDoc] 실패', {id: docId(rec.ws, rec.pnu), data: withTs, code: e.code, message: e.message, e});
-          alert('클라우드 동기화 중 문제가 발생했습니다. 콘솔을 확인하세요.');
+          console.warn('[records.setDoc] 실패', docId(rec.ws, rec.pnu), e);
       }
     }
     async function upsertSignatureLocalFirst(ws, pnu, dataUrl, signedAtISO=null){
@@ -242,8 +241,7 @@
       try {
         await setDoc(doc(fdb, "signatures", docId(ws, pnu)), payload, { merge:true });
         } catch (e) {
-          console.error('[signatures.setDoc] 실패', {id: docId(ws, pnu), code: e.code, message: e.message, e});
-          alert('클라우드 동기화(서명) 중 문제가 발생했습니다. 콘솔을 확인하세요.');
+          console.error('[signatures.setDoc] 실패', docId(ws, pnu), e);
       }
     }
     async function deleteRecordAndSignatureLocalFirst(ws, pnu){
