@@ -189,36 +189,29 @@
   window.db = db;
   </script>
 
-  <!-- 2) Firebase 초기화 (CDN 모듈, 익명 로그인 + 멤버 자동생성) -->
+<!-- 2) Firebase 초기화 (CDN 모듈, 익명 로그인 + 멤버 자동생성) -->
 <script type="module" id="firebase-init">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
   import { initializeFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
   import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
-  // 🔧 프로젝트 문서 ID (규칙과 맞춤) — 원하면 바꾸세요
   const PROJECT_ID = 'default';
   window.__PROJECT_ID = PROJECT_ID;
 
   const firebaseConfig = {
-    apiKey: "AIzaSyDh8dyrAbshk0npKTxZAdaX3_426txbRpI",
+    apiKey: "AIzaSyDh8dyrAbshk0npKTxzAdaX3_426txbRpI",
     authDomain: "jajosa-8d811.firebaseapp.com",
     projectId: "jajosa-8d811",
-    storageBucket: "jajosa-8d811.firebasestorage.app",
+    storageBucket: "jajosa-8d811.appspot.com",
     messagingSenderId: "616881022512",
-    appId: "1:616881022512:web:cf3b8c32f4535bb65a6ff5",
-    measurementId: "G-9J5C7KHCZG"
+    appId: "1:616881022512:web:cf3b8c32f4535bb65aff5",
+    measurementId: "G-9J5C7KHZCG"
   };
 
   const app = initializeApp(firebaseConfig);
-
-  // ⚙️ WebChannel 차단 환경 대응
-  const fdb = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-    useFetchStreams: false
-  });
+  const fdb = initializeFirestore(app, { experimentalAutoDetectLongPolling:true, useFetchStreams:false });
   window.__fdb = fdb;
 
-  // ✅ 익명 로그인 + 멤버 자동 생성(테스트: admin 부여)
   const auth = getAuth(app);
   window.__authReady = new Promise((resolve, reject) => {
     onAuthStateChanged(auth, async (user) => {
@@ -229,9 +222,7 @@
           if (!snap.exists()) {
             await setDoc(mref, { role: 'admin', createdAt: new Date().toISOString() });
           }
-        } catch(e) {
-          console.warn('[members bootstrap] 실패:', e);
-        }
+        } catch(e) { console.warn('[members bootstrap] 실패:', e); }
       }
       resolve();
     }, reject);
