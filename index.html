@@ -212,16 +212,16 @@
   const app = initializeApp(firebaseConfig);
   const fdb = initializeFirestore(app, {
     experimentalAutoDetectLongPolling: true,
-    useFetchStreams: false
+    useFetchStreams: false,
   });
   window.__fdb = fdb;
 
   const auth = getAuth(app);
 
-    // ✅ 멤버 문서 보장 함수 (없으면 생성)
+  // 멤버 문서 보장
   async function ensureMember() {
     const user = auth.currentUser;
-    if (!user) return; // 아직 로그인 전
+    if (!user) return;
     const mref = doc(fdb, `projects/${PROJECT_ID}/members/${user.uid}`);
     const snap = await getDoc(mref);
     if (!snap.exists()) {
@@ -229,11 +229,13 @@
     }
   }
   window.__ensureMember = ensureMember;
+
+  // 로그인 상태 준비 프라미스
   window.__authReady = new Promise((resolve, reject) => {
     onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // ✅ 읽기 없이 바로 생성(이미 있으면 merge로 그냥 유지)
         try {
+          // 읽기 없이 멤버 생성/유지
           const mref = doc(fdb, `projects/${PROJECT_ID}/members/${user.uid}`);
           await setDoc(mref, { role: 'admin', createdAt: new Date().toISOString() }, { merge: true });
         } catch (e) {
@@ -244,14 +246,14 @@
     }, reject);
   });
 
-  signInAnonymously(auth).catch((e)=>console.warn('[auth] signInAnonymously 실패', e));
+  // 익명 로그인
+  signInAnonymously(auth).catch((e) => console.warn('[auth] signInAnonymously 실패', e));
 </script>
 
-
   <!-- 3) 동기화 헬퍼(IndexedDB ↔ Firestore) -->
-  <script type="module">
+<script type="module">
   import {
-    doc, setDoc, collection, query, where, onSnapshot, deleteDoc, getDocs,
+    doc, setDoc, collection, query, onSnapshot, deleteDoc,
     serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
@@ -259,66 +261,47 @@
   const db  = window.db;
   const PROJECT_ID = window.__PROJECT_ID || 'default';
 
-  // 문서ID 안전화(슬래시 등 제거)
   const safeId = (s)=> String(s ?? '').replaceAll('/', '_');
 
-  // 규칙 경로에 맞춘 ref 헬퍼
-  const pnuCol  = () => collection(fdb, `projects/${PROJECT_ID}/pnu`);
-  const signCol = () => collection(fdb, `projects/${PROJECT_ID}/signatures`);
+  const pnuCol   = () => collection(fdb, `projects/${PROJECT_ID}/pnu`);
+  const signCol  = () => collection(fdb, `projects/${PROJECT_ID}/signatures`);
   const pnuDocRef  = (ws, pnu) => doc(fdb, `projects/${PROJECT_ID}/pnu/${safeId(ws)}__${safeId(pnu)}`);
   const signDocRef = (ws, pnu) => doc(fdb, `projects/${PROJECT_ID}/signatures/${safeId(ws)}__${safeId(pnu)}`);
 
   let applyingRemote = false;
 
-  // ▶ 레코드 업서트: 로컬 저장 후, 규칙 스키마(pnu/owner/address/content/updatedAt)로 푸시
+  // 레코드 업서트
   async function upsertRecordLocalFirst(rec){
     const now = Date.now();
-    const local = { ...rec, updatedAtMs: now };
-    await db.records.put(local);
-
+    await db.records.put({ ...rec, updatedAtMs: now });
     if (applyingRemote) return;
 
-    // ※ 규칙에서 pnu는 string 으로 변경 권장 (pnu is string)
     const remote = {
       pnu: String(rec.pnu),
       owner: rec.owner || '',
       address: rec.lot || '',
       content: rec.note || '',
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
     };
-
-    try {
-      await setDoc(pnuDocRef(rec.ws, rec.pnu), remote, { merge:true });
-    } catch (e) {
-      console.warn('[pnu.setDoc] 실패', e);
-    }
+    try { await setDoc(pnuDocRef(rec.ws, rec.pnu), remote, { merge:true }); }
+    catch (e) { console.warn('[pnu.setDoc] 실패', e); }
   }
 
-  // ▶ 서명 업서트: 로컬 저장 후, 규칙 스키마(signatureUrl/updatedAt + userId)로 푸시
+  // 서명 업서트
   async function upsertSignatureLocalFirst(ws, pnu, dataUrl, signedAtISO=null){
     const now = Date.now();
     await db.signatures.put({ ws, pnu, dataUrl, signedAt: signedAtISO || new Date().toISOString(), updatedAtMs: now });
-
     if (applyingRemote) return;
 
-    // userId는 규칙에서 create 시 본인만 허용에 필요
     const { getAuth } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
     const uid = getAuth().currentUser?.uid || 'unknown';
-    const remote = {
-      userId: uid,
-      ws, pnu,
-      signatureUrl: dataUrl,
-      updatedAt: serverTimestamp()
-    };
+    const remote = { userId: uid, ws, pnu, signatureUrl: dataUrl, updatedAt: serverTimestamp() };
 
-    try {
-      await setDoc(signDocRef(ws, pnu), remote, { merge:true });
-    } catch (e) {
-      console.warn('[sign.setDoc] 실패', e);
-    }
+    try { await setDoc(signDocRef(ws, pnu), remote, { merge:true }); }
+    catch (e) { console.warn('[sign.setDoc] 실패', e); }
   }
 
-  // ▶ 삭제
+  // 삭제
   async function deleteRecordAndSignatureLocalFirst(ws, pnu){
     await db.transaction('rw', db.records, db.signatures, async ()=>{
       await db.records.delete([ws,pnu]);
@@ -329,69 +312,55 @@
     try { await deleteDoc(signDocRef(ws, pnu)); } catch(e){ console.warn('[sign.delete] 실패', e); }
   }
 
-  // ▶ 실시간 수신(규칙 경로)
+  // 실시간 수신
   let unsubRecords=null, unsubSignatures=null;
   function stopCloudWatch(){ unsubRecords?.(); unsubRecords=null; unsubSignatures?.(); unsubSignatures=null; }
 
   function startCloudWatch(wsName){
     stopCloudWatch();
 
-    // records → 로컬 반영
-    unsubRecords = onSnapshot(
-      // 필요시 where('ws','==',wsName)로 좁힐 수도 있음. (지금은 프로젝트 전체 수신)
-      query(pnuCol()),
-      async snap=>{
-        applyingRemote = true;
-        try{
-          for(const ch of snap.docChanges()){
-            const data = ch.doc.data();
-            // 규칙 스키마 → 로컬 스키마 매핑
-            const r = {
-              ws: wsName,                         // 프로젝트 단위 컬렉션이므로 wsName 기준으로 필터링할 수도 있음
-              pnu: String(data.pnu || ''),
-              owner: data.owner || '',
-              lot: data.address || '',
-              note: data.content || '',
-              updatedAtMs: Date.now()
-            };
-            if (!r.pnu) continue;
-            // 현재 작업방에 해당하는 문서만 반영하고 싶으면 조건 추가:
-            // if (!ch.doc.id.startsWith(safeId(wsName)+'__')) continue;
-            await db.records.put(r);
-          }
-        } finally {
-          applyingRemote = false;
-          window.refreshList?.();
+    unsubRecords = onSnapshot(query(pnuCol()), async snap=>{
+      applyingRemote = true;
+      try{
+        for(const ch of snap.docChanges()){
+          const data = ch.doc.data();
+          const r = {
+            ws: wsName,
+            pnu: String(data.pnu || ''),
+            owner: data.owner || '',
+            lot: data.address || '',
+            note: data.content || '',
+            updatedAtMs: Date.now(),
+          };
+          if (!r.pnu) continue;
+          await db.records.put(r);
         }
+      } finally {
+        applyingRemote = false;
+        window.refreshList?.();
       }
-    );
+    });
 
-    // signatures → 로컬 반영
-    unsubSignatures = onSnapshot(
-      query(signCol()),
-      async snap=>{
-        applyingRemote = true;
-        try{
-          for(const ch of snap.docChanges()){
-            const d = ch.doc.data();
-            const key = ch.doc.id.split('__')[1] || ''; // id = ws__pnu
-            if (!key) continue;
-            // 현재 작업방만 반영하려면 아래 조건 추가:
-            // if (!ch.doc.id.startsWith(safeId(wsName)+'__')) continue;
-            await db.signatures.put({
-              ws: wsName,
-              pnu: key,
-              dataUrl: d.signatureUrl || '',
-              signedAt: d.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
-              updatedAtMs: Date.now()
-            });
-          }
-        } finally {
-          applyingRemote = false;
-          window.refreshList?.();
+    unsubSignatures = onSnapshot(query(signCol()), async snap=>{
+      applyingRemote = true;
+      try{
+        for(const ch of snap.docChanges()){
+          const d = ch.doc.data();
+          const key = ch.doc.id.split('__')[1] || '';
+          if (!key) continue;
+          await db.signatures.put({
+            ws: wsName,
+            pnu: key,
+            dataUrl: d.signatureUrl || '',
+            signedAt: d.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
+            updatedAtMs: Date.now(),
+          });
         }
+      } finally {
+        applyingRemote = false;
+        window.refreshList?.();
       }
-    );
+    });
   }
 
   window.SyncAPI = {
@@ -399,7 +368,7 @@
     upsertSignatureLocalFirst,
     deleteRecordAndSignatureLocalFirst,
     startCloudWatch,
-    stopCloudWatch
+    stopCloudWatch,
   };
 </script>
 
@@ -428,27 +397,30 @@
     alert('암호를 확인해주세요.'); return false;
   }
 
-  // ✅ SyncAPI 로딩 대기 유틸
+  <!-- 4) 앱 로직(UI/CRUD/서명/엑셀) -->
+<script>
+  /* ... (위쪽 기존 코드 그대로) ... */
+
+  // SyncAPI 준비 대기 (fdb도 함께 체크)
   function whenSyncReady(timeoutMs = 10000) {
     return new Promise((resolve, reject) => {
-      if (window.SyncAPI) return resolve();
       const start = Date.now();
       const iv = setInterval(() => {
-        if (window.SyncAPI) { clearInterval(iv); resolve(); }
-        else if (Date.now() - start > timeoutMs) {
-          clearInterval(iv);
-          reject(new Error('SyncAPI load timeout'));
+        if (window.SyncAPI && window.__fdb) {
+          clearInterval(iv); resolve();
+        } else if (Date.now() - start > timeoutMs) {
+          clearInterval(iv); reject(new Error('SyncAPI load timeout'));
         }
       }, 50);
     });
   }
 
- // ✅ onSnapshot 열기 전에: (1) 로그인 완료 대기 (2) 멤버 문서 보장
+  // onSnapshot 열기 전에: (1) 로그인 완료, (2) 멤버 문서 보장, (3) SyncAPI 준비 체크
   async function startWsWatch(ws) {
     if (window.__authReady)    await window.__authReady;
     if (window.__ensureMember) await window.__ensureMember();
-    await startWsWatch(currents)
-    refreshList();
+    await whenSyncReady();
+    window.SyncAPI.startCloudWatch(ws);
   }
 
   async function refreshWorkspaces(){
@@ -460,30 +432,32 @@
     wsSelect.innerHTML = list.map(w=>`<option ${w.name===currentWS?'selected':''} value="${escapeHtml(w.name)}">${escapeHtml(w.name)}</option>`).join('');
   }
 
+  // 작업방 변경 시
   wsSelect.addEventListener('change', async (e)=>{
     const targetWS=e.target.value;
     const ok=await ensureWorkspaceAuth(targetWS);
     if(!ok){ wsSelect.value=lastWS; return; }
     lastWS=targetWS; currentWS=targetWS; localStorage.setItem('pnu_current_ws', currentWS);
-    await whenSyncReady();                   // ✅ SyncAPI 준비 대기
-    window.SyncAPI.startCloudWatch(currentWS);
+    await startWsWatch(currentWS);
     refreshList();
   });
 
-  // 초기 가드 + 워치 시작
-  (async function guardInit(){
+  // 초기 가드 + 워치 시작 (load 이후 보장)
+  window.addEventListener('load', async () => {
     try {
       await refreshWorkspaces();
       const ok = await ensureWorkspaceAuth(currentWS);
       if(!ok) return;
       lastWS = currentWS;
-      await startWsWatch(currents);
+      await startWsWatch(currentWS);
       refreshList();
     } catch (e) {
       console.error('[init] SyncAPI not ready:', e);
       alert('초기화 중 문제가 발생했습니다. 콘솔을 확인해 주세요.');
     }
-  })();
+  });
+</script>
+
 
   $('#btnAddWs').addEventListener('click', async ()=>{
     const name=prompt('새 작업방 이름'); if(!name) return;
