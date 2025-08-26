@@ -455,12 +455,20 @@
     const idx={ pnu:parseInt(mapPnu.value,10), owner:parseInt(mapOwner.value,10), lot:parseInt(mapLot.value,10), note:parseInt(mapNote.value,10) };
     if(Number.isNaN(idx.pnu)) { alert('PNU 매핑은 필수'); return; }
     let upserted=0;
-    for(const row of excelRows){
-      const rec={ ws:currentWS, pnu:normalizePnu(cell(row,idx.pnu)), owner:cell(row,idx.owner), lot:cell(row,idx.lot), note:cell(row,idx.note) };
-      if(!rec.pnu) continue;
-      await window.SyncAPI.upsertRecordLocalFirst(rec);
-      upserted++;
-    }
+    await db.transaction('rw', db.records, async ()=>{
+      for(const row of excelRows){
+        const rec={ ws:currentWS, pnu:normalizePnu(cell(row,idx.pnu)), owner:cell(row,idx.owner), lot:cell(row,idx.lot), note:cell(row,idx.note) };
+        if(!rec.pnu) continue;
+        await db.records.put({ ...rec, updatedAtMs: Date.now() });
+        upserted++;
+      }
+    });
+
+  const allJustSaved = await db.records.where('ws').equals(currentWS).toArray();
+  allJustSaved.forEach(r=>{
+    window.SyncAPI?.upsertRecordLocalFirst(r);
+  });
+  
     alert(`(${currentWS}) ${upserted.toLocaleString()}건 저장/갱신`);
     mapBox.style.display='none'; fileInput.value=''; refreshList();
   });
