@@ -25,7 +25,7 @@
     input,select,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1734;color:var(--text);font-size:14px}
     input[type="file"]{padding:8px;background:transparent;border:1px dashed rgba(255,255,255,.25)}
     table{width:100%;border-collapse:separate;border-spacing:0 8px; table-layout:fixed}
-    col.pnu{width:120px} col.owner{width:120px} col.lot{width:140px} col.note{width:auto} col.sign{width:120px} col.ops{width:300px}
+    col.num{width:60px} col.pnu{width:120px} col.owner{width:120px} col.lot{width:140px} col.note{width:auto} col.sign{width:120px} col.ops{width:300px}
     thead th{font-size:12px;color:var(--muted);text-align:left;padding:4px 8px}
     tbody td{background:#0f1734;padding:10px 8px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -120,10 +120,11 @@
       <div style="overflow:auto">
         <table>
           <colgroup>
-            <col class="pnu"><col class="owner"><col class="lot"><col class="note"><col class="sign"><col class="ops">
+            <col class="num"><col class="pnu"><col class="owner"><col class="lot"><col class="note"><col class="sign"><col class="ops">
           </colgroup>
           <thead>
             <tr>
+              <th>No.</th>
               <th>PNU</th>
               <th>소유자</th>
               <th>지번</th>
@@ -132,7 +133,7 @@
               <th>작업</th>
             </tr>
           </thead>
-            <tbody id="rows"></tbody>
+          <tbody id="rows"></tbody>
         </table>
       </div>
       <div class="row" style="margin-top:8px">
@@ -247,7 +248,6 @@
       serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-    // CHANGED: 전역 재선언 방지
     const fdbRef = window.__fdb;
     const dbRef  = window.db;
     const PROJECT_ID = window.__PROJECT_ID || 'default';
@@ -373,7 +373,9 @@
   const mapBox=$('#mapBox'); const mapPnu=$('#mapPnu'); const mapOwner=$('#mapOwner'); const mapLot=$('#mapLot'); const mapNote=$('#mapNote'); const btnApplyMap=$('#btnApplyMap');
   const rowsEl=$('#rows'); const qEl=$('#q'); const sortOwnerAscBtn=$('#sortOwnerAsc'); const sortOwnerDescBtn=$('#sortOwnerDesc');
 
-  let excelHeaders=[], excelRows=[], currentQuery='', sortMode='pnu';
+  let excelHeaders=[], excelRows=[], currentQuery='';
+  // 기본 정렬을 '소유자 오름차순(가나다)'으로 설정
+  let sortMode='ownerAsc';
   let currentWS=localStorage.getItem('pnu_current_ws')||'기본', lastWS=currentWS;
 
   const WS_PASS="lx전북재조사추진단";
@@ -465,7 +467,7 @@
     const ok=await ensureWorkspaceAuth(n); if(!ok) return;
     currentWS=n; lastWS=n; localStorage.setItem('pnu_current_ws', currentWS);
     await refreshWorkspaces();
-    await startWsWatch(currentWS); // 오타 수정
+    await startWsWatch(currentWS);
     await refreshList();
   });
 
@@ -555,15 +557,18 @@
       ? all.filter(r => r.pnu.toLowerCase().includes(q) || (r.owner||'').toLowerCase().includes(q) || (r.lot||'').toLowerCase().includes(q))
       : all;
 
+    // 정렬: 기본 ownerAsc(가나다)
     if(sortMode==='ownerAsc') filtered.sort((a,b)=>(a.owner||'').localeCompare(b.owner||'','ko'));
     else if(sortMode==='ownerDesc') filtered.sort((a,b)=>(b.owner||'').localeCompare(a.owner||'','ko'));
     else filtered.sort((a,b)=>a.pnu.localeCompare(b.pnu));
 
-    rowsEl.innerHTML = filtered.map(r=>{
+    // 번호는 현재 필터/정렬 결과 기준 1부터
+    rowsEl.innerHTML = filtered.map((r, i)=>{
       const s=sigMap.get(r.pnu); const signed=!!s?.dataUrl;
       const when=s?.signedAt?new Date(s.signedAt).toLocaleString():'';      
       const pnuEnc=encodeURIComponent(r.pnu);
       return `<tr>
+        <td title="${i+1}">${i+1}</td>
         <td title="${escapeHtml(r.pnu)}"><span class="small muted">#</span> ${escapeHtml(r.pnu)}</td>
         <td title="${escapeHtml(r.owner||'')}">${escapeHtml(r.owner||'')}</td>
         <td title="${escapeHtml(r.lot||'')}">${escapeHtml(r.lot||'')}</td>
