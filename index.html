@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>재조사_경계협의서_version1.0</title>
+  <title>재조사_경계협의서_version1.1 (합의 경계 포함)</title>
   <style>
     :root{ --bg:#0b1020; --card:#111834; --muted:#8fa3c1; --text:#e8eefb; --brand:#5aa0ff; --accent:#46e0b7; --danger:#ff6b6b; }
     *{box-sizing:border-box}
@@ -25,7 +25,7 @@
     input,select,textarea{width:100%;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#0f1734;color:var(--text);font-size:14px}
     input[type="file"]{padding:8px;background:transparent;border:1px dashed rgba(255,255,255,.25)}
     table{width:100%;border-collapse:separate;border-spacing:0 8px; table-layout:fixed}
-    col.num{width:60px} col.pnu{width:120px} col.owner{width:120px} col.lot{width:140px} col.note{width:auto} col.sign{width:120px} col.ops{width:300px}
+    col.num{width:60px} col.pnu{width:120px} col.owner{width:120px} col.lot{width:140px} col.note{width:auto} col.sign{width:120px} col.ops{width:420px}
     thead th{font-size:12px;color:var(--muted);text-align:left;padding:4px 8px}
     tbody td{background:#0f1734;padding:10px 8px;border-top:1px solid rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.06);
       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -36,6 +36,7 @@
     .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 10px;font-size:12px;border:1px solid rgba(255,255,255,.12)}
     .pill.ok{background:rgba(70,224,183,.12);color:#8af0d8;border-color:rgba(70,224,183,.3)}
     .pill.no{background:rgba(255,107,107,.1);color:#ffc1c1;border-color:rgba(255,255,255,.25)}
+    .pill.req{background:rgba(255,184,77,.12);color:#ffd699;border-color:rgba(255,184,77,.35)}
     .row{display:flex;gap:10px;flex-wrap:wrap}
     .row > *{flex:1}
     .right{margin-left:auto}
@@ -43,11 +44,13 @@
     .sr{position:absolute;left:-9999px}
     .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.55);z-index:40;padding:10px}
     .modal.open{display:flex}
-    .modal .sheet{background:#0f1734;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;max-width:95vw;width:720px}
+    .modal .sheet{background:#0f1734;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;max-width:95vw;width:820px}
     .help{font-size:13px;color:var(--muted)} .small{font-size:12px}
     .tabs{display:flex;gap:6px;margin:8px 0} .tabs .btn{padding:6px 10px}
-    canvas{width:100%;height:260px;background:white;border-radius:12px;touch-action:none}
+    canvas{width:100%;height:220px;background:white;border-radius:12px;touch-action:none}
     footer{padding:40px 16px;color:#8fa3c1;text-align:center}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .line{height:1px;background:rgba(255,255,255,.08);margin:10px 0}
     @media (max-width:820px){ .hide-m{display:none} header .toolbar{gap:6px} .btn{padding:8px 10px}
       col.pnu{width:110px} col.owner{width:110px} col.lot{width:130px} }
   </style>
@@ -56,7 +59,7 @@
 <body>
   <header>
     <div class="wrap">
-      <h1>📑 재조사_경계협의서 <span class="muted">· version1.0 </span></h1>
+      <h1>📑 재조사_경계협의서 <span class="muted">· version1.1 (합의 경계)</span></h1>
       <div class="toolbar">
         <label class="muted">작업방</label>
         <select id="wsSelect" title="작업방(사업지구) 선택"></select>
@@ -88,9 +91,9 @@
       <div class="row">
         <div>
           <strong>목적</strong>
-          <div class="help">작업방 단위로 PNU별 소유자·지번·협의내용·전자서명(PNG 업로드/직접)을 관리합니다. 오프라인(IndexedDB)과 온라인(Firestore)이 자동 동기화됩니다.</div>
+          <div class="help">작업방 단위로 PNU별 소유자·지번·협의내용·전자서명(PNG 업로드/직접)을 관리하고, <b>합의 경계</b>(A↔B 상호 합의) 요청·서명·PDF 저장·표시까지 지원합니다.</div>
         </div>
-        <div class="right help hide-m">저장 위치: 로컬 IndexedDB + Firestore(동기화). 공동사용/실시간 가능.</div>
+        <div class="right help hide-m">저장: 로컬 IndexedDB + Firestore(동기화). PDF는 로컬 저장 + Firebase Storage 업로드 시도.</div>
       </div>
     </section>
 
@@ -116,7 +119,7 @@
     </section>
 
     <section class="card" id="editor">
-      <div class="help">※ 이 버전은 <strong>협의내용만 수정</strong>합니다(PNU/소유자/지번 변경은 재업로드 또는 삭제 후 등록).</div>
+      <div class="help">※ 이 버전은 <strong>협의내용</strong> 수정 + <strong>합의 경계</strong> 요청/처리를 지원합니다.</div>
       <div style="overflow:auto">
         <table>
           <colgroup>
@@ -143,12 +146,12 @@
 
     <section class="card" id="cloudInfo">
       <strong>여러 명이 함께 쓰기(실시간)</strong>
-      <div class="help">같은 작업방에 접속하면 내용이 실시간으로 동기화됩니다.</div>
+      <div class="help">같은 작업방에 접속하면 내용이 실시간으로 동기화됩니다. 합의요청은 상대 PNU 행에 즉시 표시됩니다.</div>
     </section>
   </main>
 
   <footer>
-    <div class="small">※ 서명 이미지는 로컬 DB 및 Firestore에 Data URL(Base64)로 저장됩니다. 법적 전자서명은 별도 시스템 연동 필요.</div>
+    <div class="small">※ 서명 이미지는 로컬 DB 및 Firestore에 Data URL(Base64)로 저장됩니다. 법적 전자서명은 별도 시스템 연동 필요. 주민번호 앞7자리 등 민감정보는 내부 용도로만 사용하세요.</div>
   </footer>
 
   <!-- libs -->
@@ -157,6 +160,9 @@
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.2.0/dist/signature_pad.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+  <!-- PDF: html2canvas + jsPDF (한글 렌더링 안전) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
   <!-- 1) Dexie(IndexedDB) -->
   <script>
@@ -187,6 +193,13 @@
     for (const r of recs) { if (typeof r.updatedAtMs !== 'number') { r.updatedAtMs = now; await tx.table('records').put(r); } }
     const sigs = await tx.table('signatures').toArray().catch(()=>[]);
     for (const s of sigs) { if (typeof s.updatedAtMs !== 'number') { s.updatedAtMs = now; await tx.table('signatures').put(s); } }
+  });
+  /* v4: 합의 경계 테이블 추가 */
+  db.version(4).stores({
+    workspaces:'name',
+    records:'[ws+pnu], ws, pnu, updatedAtMs',
+    signatures:'[ws+pnu], ws, pnu, updatedAtMs',
+    agreements:'[ws+agid], ws, agid, fromPnu, toPnu, status, updatedAtMs'
   });
   window.db = db;
   </script>
@@ -241,23 +254,27 @@
     signInAnonymously(auth).catch((e) => console.warn('[auth] signInAnonymously 실패', e));
   </script>
 
-  <!-- 3) 동기화 헬퍼(IndexedDB ↔ Firestore) -->
+  <!-- 3) 동기화 헬퍼(IndexedDB ↔ Firestore) + Storage 업로드 -->
   <script type="module">
     import {
-      doc, setDoc, collection, query, onSnapshot, deleteDoc,
-      serverTimestamp
+      doc, setDoc, collection, query, onSnapshot, deleteDoc, serverTimestamp, getDoc
     } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+    import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
     const fdbRef = window.__fdb;
     const dbRef  = window.db;
     const PROJECT_ID = window.__PROJECT_ID || 'default';
+    const storage = getStorage(); // default app
 
     const safeId = (s)=> String(s ?? '').replaceAll('/', '_');
 
     const pnuCol   = () => collection(fdbRef, `projects/${PROJECT_ID}/pnu`);
     const signCol  = () => collection(fdbRef, `projects/${PROJECT_ID}/signatures`);
-    const pnuDocRef  = (ws, pnu) => doc(fdbRef, `projects/${PROJECT_ID}/pnu/${safeId(ws)}__${safeId(pnu)}`);
-    const signDocRef = (ws, pnu) => doc(fdbRef, `projects/${PROJECT_ID}/signatures/${safeId(ws)}__${safeId(pnu)}`);
+    const agreeCol = () => collection(fdbRef, `projects/${PROJECT_ID}/agreements`);
+
+    const pnuDocRef   = (ws, pnu) => doc(fdbRef, `projects/${PROJECT_ID}/pnu/${safeId(ws)}__${safeId(pnu)}`);
+    const signDocRef  = (ws, pnu) => doc(fdbRef, `projects/${PROJECT_ID}/signatures/${safeId(ws)}__${safeId(pnu)}`);
+    const agreeDocRef = (ws, agid)=> doc(fdbRef, `projects/${PROJECT_ID}/agreements/${safeId(ws)}__${safeId(agid)}`);
 
     let applyingRemote = false;
 
@@ -265,27 +282,18 @@
       const now = Date.now();
       await dbRef.records.put({ ...rec, updatedAtMs: now });
       if (applyingRemote) return;
-
-      const remote = {
-        pnu: String(rec.pnu),
-        owner: rec.owner || '',
-        address: rec.lot || '',
-        content: rec.note || '',
-        updatedAt: serverTimestamp(),
-      };
+      const remote = { pnu:String(rec.pnu), owner:rec.owner||'', address:rec.lot||'', content:rec.note||'', updatedAt: serverTimestamp() };
       try { await setDoc(pnuDocRef(rec.ws, rec.pnu), remote, { merge:true }); }
       catch (e) { console.warn('[pnu.setDoc] 실패', e); }
     }
 
     async function upsertSignatureLocalFirst(ws, pnu, dataUrl, signedAtISO=null){
       const now = Date.now();
-      await dbRef.signatures.put({ ws, pnu, dataUrl, signedAt: signedAtISO || new Date().toISOString(), updatedAtMs: now });
+      await dbRef.signatures.put({ ws, pnu, dataUrl, signedAt:signedAtISO||new Date().toISOString(), updatedAtMs: now });
       if (applyingRemote) return;
-
       const { getAuth } = await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js");
       const uid = getAuth().currentUser?.uid || 'unknown';
       const remote = { userId: uid, ws, pnu, signatureUrl: dataUrl, updatedAt: serverTimestamp() };
-
       try { await setDoc(signDocRef(ws, pnu), remote, { merge:true }); }
       catch (e) { console.warn('[sign.setDoc] 실패', e); }
     }
@@ -300,8 +308,48 @@
       try { await deleteDoc(signDocRef(ws, pnu)); } catch(e){ console.warn('[sign.delete] 실패', e); }
     }
 
-    let unsubRecords=null, unsubSignatures=null;
-    function stopCloudWatch(){ unsubRecords?.(); unsubRecords=null; unsubSignatures?.(); unsubSignatures=null; }
+    /* === 합의 경계 동기화 === */
+    async function upsertAgreementLocalFirst(ag){
+      const now = Date.now();
+      const payload = { ...ag, updatedAtMs: now };
+      await dbRef.agreements.put(payload);
+      if (applyingRemote) return;
+      const remote = { ...payload }; delete remote.updatedAtMs;
+      remote.updatedAt = serverTimestamp();
+      try { await setDoc(agreeDocRef(ag.ws, ag.agid), remote, { merge:true }); }
+      catch (e) { console.warn('[agree.setDoc] 실패', e); }
+    }
+
+    async function setAgreementStatusLocalFirst(ws, agid, nextStatus, extra={}){
+      const ag = await dbRef.agreements.get([ws, agid]); if(!ag) return;
+      const updated = { ...ag, status: nextStatus, ...extra, updatedAtMs: Date.now() };
+      await dbRef.agreements.put(updated);
+      if (applyingRemote) return;
+      const remote = { status: nextStatus, ...extra, updatedAt: serverTimestamp() };
+      try { await setDoc(agreeDocRef(ws, agid), remote, { merge:true }); }
+      catch (e) { console.warn('[agree.status] 실패', e); }
+    }
+
+    async function uploadAgreementPdfAndSaveUrl(ws, agid, blob, filename, field='pdfUrl'){
+      try {
+        const path = `projects/${PROJECT_ID}/agreements/${safeId(ws)}__${safeId(agid)}/${filename}`;
+        const r = sRef(storage, path);
+        const snap = await uploadBytes(r, blob, { contentType: 'application/pdf' });
+        const url = await getDownloadURL(snap.ref);
+        await setAgreementStatusLocalFirst(ws, agid, (await dbRef.agreements.get([ws,agid]))?.status || 'REQUESTED', { [field]: url });
+        return url;
+      } catch (e){
+        console.warn('[storage.upload] 실패:', e);
+        return null;
+      }
+    }
+
+    let unsubRecords=null, unsubSignatures=null, unsubAgreements=null;
+    function stopCloudWatch(){
+      unsubRecords?.(); unsubRecords=null;
+      unsubSignatures?.(); unsubSignatures=null;
+      unsubAgreements?.(); unsubAgreements=null;
+    }
 
     function startCloudWatch(wsName){
       stopCloudWatch();
@@ -313,22 +361,12 @@
             const data = ch.doc.data();
             const [idWs, idPnu] = (ch.doc.id.split('__')||[]);
             if (!idWs || !idPnu) continue;
-            if (idWs !== safeId(wsName)) continue; // 현재 작업방만 반영
-            const r = {
-              ws: wsName,
-              pnu: String(data.pnu || idPnu),
-              owner: data.owner || '',
-              lot: data.address || '',
-              note: data.content || '',
-              updatedAtMs: Date.now(),
-            };
+            if (idWs !== safeId(wsName)) continue;
+            const r = { ws: wsName, pnu: String(data.pnu || idPnu), owner: data.owner || '', lot: data.address || '', note: data.content || '', updatedAtMs: Date.now() };
             if (!r.pnu) continue;
             await dbRef.records.put(r);
           }
-        } finally {
-          applyingRemote = false;
-          window.refreshList?.();
-        }
+        } finally { applyingRemote = false; window.refreshList?.(); }
       });
 
       unsubSignatures = onSnapshot(query(signCol()), async snap=>{
@@ -337,20 +375,39 @@
           for(const ch of snap.docChanges()){
             const [idWs, idPnu] = (ch.doc.id.split('__')||[]);
             if (!idWs || !idPnu) continue;
-            if (idWs !== safeId(wsName)) continue; // 현재 작업방만 반영
+            if (idWs !== safeId(wsName)) continue;
             const d = ch.doc.data();
             await dbRef.signatures.put({
-              ws: wsName,
-              pnu: idPnu,
-              dataUrl: d.signatureUrl || '',
+              ws: wsName, pnu: idPnu, dataUrl: d.signatureUrl || '',
               signedAt: d.updatedAt?.toDate?.()?.toISOString?.() || new Date().toISOString(),
               updatedAtMs: Date.now(),
             });
           }
-        } finally {
-          applyingRemote = false;
-          window.refreshList?.();
-        }
+        } finally { applyingRemote = false; window.refreshList?.(); }
+      });
+
+      unsubAgreements = onSnapshot(query(agreeCol()), async snap=>{
+        applyingRemote = true;
+        try {
+          for(const ch of snap.docChanges()){
+            const id = ch.doc.id;
+            const [idWs, idAgid] = (id.split('__')||[]);
+            if (!idWs || !idAgid) continue;
+            if (idWs !== safeId(wsName)) continue;
+            const d = ch.doc.data();
+            const loc = d.loc || {};
+            const rec = {
+              ws: wsName, agid: idAgid,
+              fromPnu: d.fromPnu, toPnu: d.toPnu, status: d.status || 'REQUESTED',
+              from: d.from || {}, to: d.to || {}, loc,
+              aSigDataUrl: d.aSigDataUrl || '', bSigDataUrl: d.bSigDataUrl || '',
+              pdfUrl: d.pdfUrl || '', pdfUrlFinal: d.pdfUrlFinal || '',
+              note: d.note || '',
+              createdAt: d.createdAt || '', updatedAtMs: Date.now()
+            };
+            await dbRef.agreements.put(rec);
+          }
+        } finally { applyingRemote = false; window.refreshList?.(); }
       });
     }
 
@@ -358,12 +415,15 @@
       upsertRecordLocalFirst,
       upsertSignatureLocalFirst,
       deleteRecordAndSignatureLocalFirst,
+      upsertAgreementLocalFirst,
+      setAgreementStatusLocalFirst,
+      uploadAgreementPdfAndSaveUrl,
       startCloudWatch,
       stopCloudWatch,
     };
   </script>
 
-  <!-- 4) 앱 로직(UI/CRUD/서명/엑셀) -->
+  <!-- 4) 앱 로직(UI/CRUD/서명/엑셀/합의경계) -->
   <script>
   window.ResizeObserver = window.ResizeObserver || class { constructor(){ } observe(){ } unobserve(){ } disconnect(){ } };
 
@@ -374,7 +434,6 @@
   const rowsEl=$('#rows'); const qEl=$('#q'); const sortOwnerAscBtn=$('#sortOwnerAsc'); const sortOwnerDescBtn=$('#sortOwnerDesc');
 
   let excelHeaders=[], excelRows=[], currentQuery='';
-  // 기본 정렬을 '소유자 오름차순(가나다)'으로 설정
   let sortMode='ownerAsc';
   let currentWS=localStorage.getItem('pnu_current_ws')||'기본', lastWS=currentWS;
 
@@ -392,11 +451,8 @@
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const iv = setInterval(() => {
-        if (window.SyncAPI && window.__fdb) {
-          clearInterval(iv); resolve();
-        } else if (Date.now() - start > timeoutMs) {
-          clearInterval(iv); reject(new Error('SyncAPI load timeout'));
-        }
+        if (window.SyncAPI && window.__fdb) { clearInterval(iv); resolve(); }
+        else if (Date.now() - start > timeoutMs) { clearInterval(iv); reject(new Error('SyncAPI load timeout')); }
       }, 50);
     });
   }
@@ -552,21 +608,26 @@
     const sigs=await db.signatures.where('ws').equals(currentWS).toArray();
     const sigMap=new Map(sigs.map(s=>[s.pnu,s]));
 
+    // 합의요청 카운트(해당 PNU가 수신자(toPnu)인 REQUESTED)
+    const ags = await db.agreements.where('ws').equals(currentWS).toArray();
+    const pendingCountMap = new Map();
+    for(const a of ags){ if(a.status==='REQUESTED'){ pendingCountMap.set(a.toPnu, (pendingCountMap.get(a.toPnu)||0)+1); } }
+
     const q=currentQuery.trim().toLowerCase();
     let filtered = q
       ? all.filter(r => r.pnu.toLowerCase().includes(q) || (r.owner||'').toLowerCase().includes(q) || (r.lot||'').toLowerCase().includes(q))
       : all;
 
-    // 정렬: 기본 ownerAsc(가나다)
     if(sortMode==='ownerAsc') filtered.sort((a,b)=>(a.owner||'').localeCompare(b.owner||'','ko'));
     else if(sortMode==='ownerDesc') filtered.sort((a,b)=>(b.owner||'').localeCompare(a.owner||'','ko'));
     else filtered.sort((a,b)=>a.pnu.localeCompare(b.pnu));
 
-    // 번호는 현재 필터/정렬 결과 기준 1부터
     rowsEl.innerHTML = filtered.map((r, i)=>{
       const s=sigMap.get(r.pnu); const signed=!!s?.dataUrl;
       const when=s?.signedAt?new Date(s.signedAt).toLocaleString():'';      
       const pnuEnc=encodeURIComponent(r.pnu);
+      const cnt = pendingCountMap.get(r.pnu)||0;
+      const reqBtn = cnt>0 ? `<button class="btn danger btn-incoming" title="받은 합의요청 처리" data-pnu="${pnuEnc}">📬 요청처리(${cnt})</button>` : '';
       return `<tr>
         <td title="${i+1}">${i+1}</td>
         <td title="${escapeHtml(r.pnu)}"><span class="small muted">#</span> ${escapeHtml(r.pnu)}</td>
@@ -579,6 +640,8 @@
             <button class="btn btn-edit" data-pnu="${pnuEnc}">✏️ 협의내용</button>
             <button class="btn accent btn-sign" data-pnu="${pnuEnc}">✍️ 서명(업로드/직접)</button>
             <button class="btn btn-preview" data-pnu="${pnuEnc}">🖼️ 서명보기</button>
+            <button class="btn brand btn-agree" data-pnu="${pnuEnc}">🤝 합의 경계</button>
+            ${reqBtn}
             <button class="btn danger btn-del" data-pnu="${pnuEnc}">🗑️ 삭제</button>
           </div>
         </td>
@@ -609,6 +672,10 @@
       const s=await db.signatures.get([currentWS,pnu]);
       if(!s?.dataUrl){ alert('서명이 없습니다.'); return; }
       const win=window.open(); win.document.write(`<img alt="signature" src="${s.dataUrl}">`);
+    }else if(btn.classList.contains('btn-agree')){
+      openAgreeModal(pnu); // 합의 경계 작성(A측)
+    }else if(btn.classList.contains('btn-incoming')){
+      openIncomingModal(pnu); // 수신 합의요청 목록(B측)
     }else if(btn.classList.contains('btn-del')){
       if(!confirm(`삭제할까요?\n[${currentWS}] PNU: ${pnu}`)) return;
       await window.SyncAPI.deleteRecordAndSignatureLocalFirst(currentWS, pnu);
@@ -616,7 +683,7 @@
     }
   });
 
-  // 협의내용 모달
+  /* ---------- 협의내용 모달 ---------- */
   let noteModal, noteTextarea, noteSaveBtn, noteCloseBtn, notePnuLabel, notePnu='';
   function ensureNoteModal(){
     if(noteModal) return;
@@ -653,7 +720,7 @@
     noteTextarea.value=note||''; noteModal.classList.add('open'); noteTextarea.focus();
   }
 
-  // 서명 모달
+  /* ---------- 서명 모달 ---------- */
   let sigModal, tabUploadBtn, tabDrawBtn, upFile, upPreview, drawCanvas, drawPad, clearDrawBtn, saveSigBtn, closeSigBtn, sigPnuLabel, sigPnu='';
   function ensureSignModal(){
     if(sigModal) return;
@@ -720,7 +787,7 @@
   function resizeDrawCanvas(){
     const ratio=Math.max(window.devicePixelRatio||1,1);
     const rect=drawCanvas.getBoundingClientRect();
-    drawCanvas.width=rect.width*ratio; drawCanvas.height=260*ratio; const ctx=drawCanvas.getContext('2d'); ctx.scale(ratio,ratio);
+    drawCanvas.width=rect.width*ratio; drawCanvas.height=220*ratio; const ctx=drawCanvas.getContext('2d'); ctx.scale(ratio,ratio);
   }
   async function fileToDataURL(f){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=e=>res(e.target.result); r.onerror=rej; r.readAsDataURL(f); }); }
   async function openSignModal(pnu){
@@ -731,80 +798,370 @@
     sigModal.classList.add('open'); setTimeout(resizeDrawCanvas, 50);
   }
 
-  // 엑셀 내보내기 (서명 이미지 삽입)
-  $('#btnExportXlsx').addEventListener('click', async ()=>{
-    const wb=new ExcelJS.Workbook();
-    const ws=wb.addWorksheet(currentWS.slice(0,31));
-    const headers=['작업방','PNU','소유자','지번','협의내용','서명여부','서명시각','서명이미지'];
-    ws.addRow(headers); ws.getRow(1).font={bold:true};
-    ws.columns=[ {key:'ws',width:12},{key:'pnu',width:20},{key:'owner',width:14},{key:'lot',width:18},{key:'note',width:60},{key:'signed',width:10},{key:'signedAt',width:20},{key:'sigImg',width:30} ];
+  /* ---------- 합의 경계: A측 작성 모달 ---------- */
+  let agreeModal, aSigPad, aCanvas, agreeSaveBtn, agreeCloseBtn, toPnuInput, toPnuList, draftPdfBtn;
+  function ensureAgreeModal(){
+    if(agreeModal) return;
+    agreeModal=document.createElement('div'); agreeModal.className='modal';
+    agreeModal.innerHTML=`
+      <div class="sheet">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">🤝 합의 경계 — 요청 작성</h3><span class="right"></span>
+          <button class="btn" id="btnCloseAgree">닫기</button>
+        </div>
+        <div class="help" id="agreeHeader" style="margin:6px 0 10px"></div>
 
-    const recs=await db.records.where('ws').equals(currentWS).toArray();
-    const sigMap=new Map((await db.signatures.where('ws').equals(currentWS).toArray()).map(s=>[s.pnu,s]));
-    const imageWidth=180, imageHeight=60;
+        <div class="grid2">
+          <div>
+            <label>상대 PNU(검색/선택)</label>
+            <input list="pnuList" id="toPnuInput" placeholder="상대 PNU 입력" />
+            <datalist id="pnuList"></datalist>
+          </div>
+          <div>
+            <label>합의 위치(면/동/리/지번)</label>
+            <input id="locMdrj" placeholder="예: ○○면 ○○리 ○○-○" />
+          </div>
+          <div>
+            <label>A(요청자) 소유자명</label>
+            <input id="aName" />
+          </div>
+          <div>
+            <label>A 생년월일(앞 7자리)</label>
+            <input id="aDob7" placeholder="YYMMDDX" />
+          </div>
+          <div>
+            <label>A 주소</label>
+            <input id="aAddr" />
+          </div>
+          <div>
+            <label>B(상대) 소유자명</label>
+            <input id="bName" />
+          </div>
+          <div>
+            <label>B 생년월일(앞 7자리)</label>
+            <input id="bDob7" placeholder="YYMMDDX" />
+          </div>
+          <div>
+            <label>B 주소</label>
+            <input id="bAddr" />
+          </div>
+        </div>
 
-    for(const r of recs){
-      const sig=sigMap.get(r.pnu);
-      const row=ws.addRow({
-        ws: currentWS,
-        pnu: r.pnu, owner: r.owner||'', lot: r.lot||'',
-        note: r.note||'',
-        signed: sig?'Y':'N',
-        signedAt: sig?.signedAt? new Date(sig.signedAt).toLocaleString(): '',
-        sigImg: ''
-      });
-      row.alignment={vertical:'top', wrapText:true};
-      if(sig?.dataUrl){
-        const base64=sig.dataUrl.split(',')[1];
-        const imageId=wb.addImage({ base64, extension:'png' });
-        const rowNumber=row.number;
-        ws.addImage(imageId, { tl:{ col:7, row:rowNumber-1 }, ext:{ width:imageWidth, height:imageHeight } });
-        ws.getRow(rowNumber).height = Math.max(ws.getRow(rowNumber).height||0, 50);
+        <div class="line"></div>
+
+        <label>협의 내용(요지)</label>
+        <textarea id="agreeNote" rows="5" placeholder="합의 경계에 대한 요지를 입력하세요."></textarea>
+
+        <div class="line"></div>
+
+        <div>
+          <label>A 서명</label>
+          <canvas id="aSignCanvas"></canvas>
+          <div class="row" style="margin-top:8px">
+            <button class="btn" id="btnClearASign">지우기</button>
+            <span class="right"></span>
+            <button class="btn brand" id="btnSaveAgree">요청 저장(REQUESTED)</button>
+          </div>
+          <div class="help">저장 시 상대 PNU 행에 📬 합의요청 표시가 나타납니다.</div>
+        </div>
+      </div>`;
+    document.body.appendChild(agreeModal);
+
+    aCanvas = agreeModal.querySelector('#aSignCanvas');
+    aSigPad = new window.SignaturePad(aCanvas, { backgroundColor:'white', penColor:'black' });
+    const ro=new ResizeObserver(()=>resizeCanvas(aCanvas,200)); ro.observe(aCanvas);
+    agreeCloseBtn = agreeModal.querySelector('#btnCloseAgree');
+    agreeSaveBtn  = agreeModal.querySelector('#btnSaveAgree');
+    toPnuInput    = agreeModal.querySelector('#toPnuInput');
+    toPnuList     = agreeModal.querySelector('#pnuList');
+
+    agreeModal.querySelector('#btnClearASign').addEventListener('click', ()=> aSigPad.clear());
+    agreeCloseBtn.addEventListener('click', ()=> agreeModal.classList.remove('open'));
+    agreeSaveBtn.addEventListener('click', saveAgreementRequest);
+  }
+
+  let agreeFromPnu='';
+  async function openAgreeModal(fromPnu){
+    ensureAgreeModal();
+    agreeFromPnu = fromPnu;
+    // datalist 채우기
+    const list = await db.records.where('ws').equals(currentWS).toArray();
+    toPnuList.innerHTML = list.map(r=>`<option value="${escapeHtml(r.pnu)}">${escapeHtml(r.pnu)} · ${escapeHtml(r.owner||'')} · ${escapeHtml(r.lot||'')}</option>`).join('');
+
+    // A측 자동 채우기
+    const recA = await db.records.get([currentWS, fromPnu]);
+    agreeModal.querySelector('#agreeHeader').textContent = `[${currentWS}] 요청자 PNU ${fromPnu} · ${recA?.owner||''} · ${recA?.lot||''}`;
+    agreeModal.querySelector('#aName').value = recA?.owner || '';
+    agreeModal.querySelector('#aAddr').value = recA?.lot || '';
+    agreeModal.querySelector('#aDob7').value = '';
+
+    // B측 초기화
+    agreeModal.querySelector('#toPnuInput').value = '';
+    agreeModal.querySelector('#bName').value = '';
+    agreeModal.querySelector('#bDob7').value = '';
+    agreeModal.querySelector('#bAddr').value = '';
+    agreeModal.querySelector('#locMdrj').value = '';
+    agreeModal.querySelector('#agreeNote').value = '';
+    aSigPad.clear();
+
+    // toPnu 선택 시 B 자동 채움
+    agreeModal.querySelector('#toPnuInput').onchange = async (e)=>{
+      const p = normalizePnu(e.target.value||'');
+      if(!p) return;
+      const recB = await db.records.get([currentWS, p]);
+      if(recB){
+        agreeModal.querySelector('#bName').value = recB.owner||'';
+        agreeModal.querySelector('#bAddr').value = recB.lot||'';
       }
-    }
-    ws.eachRow((row,rn)=>{ row.eachCell(cell=>{ cell.border={ top:{style:'thin'},left:{style:'thin'},bottom:{style:'thin'},right:{style:'thin'} }; if(rn===1){ cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEEF3FF'}}; } }); });
-    const buf=await wb.xlsx.writeBuffer();
-    saveAs(new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}), `pnu_${sanitizeFile(currentWS)}_${fmtDate()}.xlsx`);
-  });
+    };
 
-  $('#btnExportJson').addEventListener('click', async ()=>{
-    const payload={ exportedAt:new Date().toISOString(), workspaces:await db.workspaces.toArray(), records:await db.records.toArray(), signatures:await db.signatures.toArray() };
-    downloadBlob(new Blob([JSON.stringify(payload,null,2)], {type:'application/json'}), `pnu_backup_all_${fmtDate()}.json`);
-  });
-  $('#btnImportJson').addEventListener('click', ()=> $('#jsonFile').click());
-  $('#jsonFile').addEventListener('change', async e=>{
-    const f=e.target.files?.[0]; if(!f) return;
-    const data=JSON.parse(await f.text());
-    if(!Array.isArray(data.records)||!Array.isArray(data.signatures)) { alert('백업 형식이 올바르지 않습니다.'); return; }
-    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
-      await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear();
-    });
-    const wsList=data.workspaces?.length?data.workspaces:[{name:'기본'}];
-    for(const w of wsList) await db.workspaces.put({name:w.name});
-    for(const r of data.records) await db.records.put(r);
-    for(const s of data.signatures) await db.signatures.put(s);
-    await refreshWorkspaces(); alert('복원 완료'); refreshList();
-  });
-  $('#btnTemplate').addEventListener('click', ()=>{
-    const wb=XLSX.utils.book_new();
-    const rows=[{ PNU:'1111010100100000000', 소유자:'홍길동', 지번:'서울 종로구 1-1', 협의내용:'보상 협의 1차 완료' }];
-    const ws=XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb, ws, '템플릿'); XLSX.writeFile(wb,'pnu_template.xlsx');
-  });
-  $('#btnReset').addEventListener('click', async ()=>{
-    if(!confirm('DB 초기화? 모든 작업방의 레코드/서명이 삭제됩니다.')) return;
-    await db.transaction('rw', db.workspaces, db.records, db.signatures, async ()=>{
-      await db.workspaces.clear(); await db.records.clear(); await db.signatures.clear();
-    });
-    await db.workspaces.put({name:'기본'}); currentWS='기본'; lastWS='기본'; localStorage.setItem('pnu_current_ws', currentWS);
-    await refreshWorkspaces();
-    await whenSyncReady();
-    window.SyncAPI.startCloudWatch(currentWS);
+    agreeModal.classList.add('open');
+    setTimeout(()=>resizeCanvas(aCanvas,200), 50);
+  }
+
+  function resizeCanvas(cvs, h=200){
+    const ratio=Math.max(window.devicePixelRatio||1,1);
+    const rect=cvs.getBoundingClientRect();
+    cvs.width=rect.width*ratio; cvs.height=h*ratio; const ctx=cvs.getContext('2d'); ctx.scale(ratio,ratio);
+  }
+
+  function genAgid(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}_${Math.random().toString(36).slice(2,6)}`; }
+
+  async function saveAgreementRequest(){
+    const toPnu = normalizePnu(toPnuInput.value||'');
+    if(!toPnu){ alert('상대 PNU를 입력하세요.'); return; }
+    if(aSigPad.isEmpty()){ alert('A 서명이 필요합니다.'); return; }
+
+    const aName = agreeModal.querySelector('#aName').value.trim();
+    const aDob7 = agreeModal.querySelector('#aDob7').value.trim();
+    const aAddr = agreeModal.querySelector('#aAddr').value.trim();
+    const bName = agreeModal.querySelector('#bName').value.trim();
+    const bDob7 = agreeModal.querySelector('#bDob7').value.trim();
+    const bAddr = agreeModal.querySelector('#bAddr').value.trim();
+    const locMdrj = agreeModal.querySelector('#locMdrj').value.trim();
+    const note = (agreeModal.querySelector('#agreeNote').value||'').trim();
+
+    const ag = {
+      ws: currentWS,
+      agid: genAgid(),
+      fromPnu: agreeFromPnu,
+      toPnu,
+      status: 'REQUESTED',
+      from: { name: aName, dob7: aDob7, addr: aAddr },
+      to:   { name: bName, dob7: bDob7, addr: bAddr },
+      loc:  { mdrj: locMdrj },
+      aSigDataUrl: aSigPad.toDataURL('image/png'),
+      bSigDataUrl: '',
+      note, createdAt: new Date().toISOString(),
+    };
+
+    await window.SyncAPI.upsertAgreementLocalFirst(ag);
+    // 요청 PDF(초안) 생성 및 업로드 시도
+    const blob = await buildAgreementPdfBlob(ag, /*final=*/false);
+    const filename = `agreement_${ag.agid}_REQUESTED.pdf`;
+    const url = await window.SyncAPI.uploadAgreementPdfAndSaveUrl(currentWS, ag.agid, blob, filename, 'pdfUrl');
+    if(!url){ saveAs(blob, filename); } // 업로드 실패 시 로컬 저장
+
+    agreeModal.classList.remove('open');
+    alert('합의요청이 저장되었습니다. 상대 PNU에 📬 표시가 나타납니다.');
     refreshList();
-  });
+  }
+
+  /* ---------- 합의 경계: B측 수신/처리 모달 ---------- */
+  let incomingModal, incomingListEl;
+  function ensureIncomingModal(){
+    if(incomingModal) return;
+    incomingModal=document.createElement('div'); incomingModal.className='modal';
+    incomingModal.innerHTML=`
+      <div class="sheet">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">📬 받은 합의요청</h3><span class="right"></span>
+          <button class="btn" id="btnCloseIncoming">닫기</button>
+        </div>
+        <div class="help" id="incomingHead" style="margin:6px 0 10px"></div>
+        <div id="incomingList"></div>
+      </div>`;
+    document.body.appendChild(incomingModal);
+    incomingListEl = incomingModal.querySelector('#incomingList');
+    incomingModal.querySelector('#btnCloseIncoming').addEventListener('click', ()=> incomingModal.classList.remove('open'));
+  }
+
+  async function openIncomingModal(pnu){
+    ensureIncomingModal();
+    incomingModal.querySelector('#incomingHead').textContent = `[${currentWS}] PNU ${pnu} 수신 항목`;
+    const list = await db.agreements.where('ws').equals(currentWS).toArray();
+    const items = list.filter(a=> a.toPnu===pnu && a.status==='REQUESTED');
+    if(!items.length){ incomingListEl.innerHTML = `<div class="help">대기 중인 합의요청이 없습니다.</div>`; }
+    else{
+      incomingListEl.innerHTML = items.map(a=>{
+        const when = new Date(a.createdAt||Date.now()).toLocaleString();
+        return `<div class="card" style="margin-bottom:8px">
+          <div><b>요청ID:</b> ${escapeHtml(a.agid)}</div>
+          <div class="small muted">${escapeHtml(when)} · from ${escapeHtml(a.fromPnu)} → to ${escapeHtml(a.toPnu)}</div>
+          <div class="small">A: ${escapeHtml(a.from?.name||'')} / B: ${escapeHtml(a.to?.name||'')}</div>
+          <div class="row" style="margin-top:8px">
+            <button class="btn brand" data-agid="${a.agid}" data-action="review">검토 및 서명</button>
+            <button class="btn danger" data-agid="${a.agid}" data-action="reject">반려</button>
+          </div>
+        </div>`;
+      }).join('');
+      incomingListEl.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const agid = btn.dataset.agid;
+          const action = btn.dataset.action;
+          if(action==='reject'){
+            if(confirm('이 요청을 반려하시겠습니까?')){
+              await window.SyncAPI.setAgreementStatusLocalFirst(currentWS, agid, 'REJECTED');
+              alert('반려 처리되었습니다.');
+              openIncomingModal(pnu); refreshList();
+            }
+          }else if(action==='review'){
+            openFinalizeModal(agid, pnu);
+          }
+        });
+      });
+    }
+    incomingModal.classList.add('open');
+  }
+
+  /* ---------- 합의 경계: 최종 서명 모달(B측 서명) ---------- */
+  let finModal, bCanvas, bPad, finCloseBtn, finApproveBtn, finInfoBox;
+  function ensureFinalizeModal(){
+    if(finModal) return;
+    finModal=document.createElement('div'); finModal.className='modal';
+    finModal.innerHTML=`
+      <div class="sheet">
+        <div class="row" style="align-items:center">
+          <h3 style="margin:0">최종 검토 및 B 서명</h3><span class="right"></span>
+          <button class="btn" id="btnCloseFin">닫기</button>
+        </div>
+        <div id="finInfo" class="help" style="margin:6px 0 10px"></div>
+        <div><label>B 서명</label><canvas id="bSignCanvas"></canvas></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn" id="btnClearB">지우기</button>
+          <span class="right"></span>
+          <button class="btn brand" id="btnApprove">동의하고 서명(AGREED)</button>
+        </div>
+      </div>`;
+    document.body.appendChild(finModal);
+    finInfoBox = finModal.querySelector('#finInfo');
+    bCanvas = finModal.querySelector('#bSignCanvas');
+    bPad = new window.SignaturePad(bCanvas, { backgroundColor:'white', penColor:'black' });
+    const ro=new ResizeObserver(()=>resizeCanvas(bCanvas,200)); ro.observe(bCanvas);
+    finCloseBtn = finModal.querySelector('#btnCloseFin');
+    finApproveBtn = finModal.querySelector('#btnApprove');
+    finModal.querySelector('#btnClearB').addEventListener('click', ()=> bPad.clear());
+    finCloseBtn.addEventListener('click', ()=> finModal.classList.remove('open'));
+  }
+
+  async function openFinalizeModal(agid, toPnu){
+    ensureFinalizeModal();
+    const ag = await db.agreements.get([currentWS, agid]);
+    if(!ag){ alert('합의요청을 찾지 못했습니다.'); return; }
+    finInfoBox.textContent = `요청ID ${ag.agid} · 위치 ${ag.loc?.mdrj||''} · A:${ag.from?.name||''} · B:${ag.to?.name||''}`;
+    bPad.clear();
+    finApproveBtn.onclick = async ()=>{
+      if(bPad.isEmpty()){ alert('B 서명이 필요합니다.'); return; }
+      const dataUrl = bPad.toDataURL('image/png');
+      await window.SyncAPI.setAgreementStatusLocalFirst(currentWS, agid, 'AGREED', { bSigDataUrl: dataUrl });
+
+      // 최종 PDF 생성
+      const updated = await db.agreements.get([currentWS, agid]);
+      const blob = await buildAgreementPdfBlob(updated, /*final=*/true);
+      const filename = `agreement_${agid}_AGREED.pdf`;
+      const url = await window.SyncAPI.uploadAgreementPdfAndSaveUrl(currentWS, agid, blob, filename, 'pdfUrlFinal');
+      if(!url){ saveAs(blob, filename); } // 업로드 실패 시 로컬 저장
+
+      alert('최종 서명/저장이 완료되었습니다.');
+      finModal.classList.remove('open');
+      openIncomingModal(toPnu);
+      refreshList();
+    };
+    finModal.classList.add('open');
+    setTimeout(()=>resizeCanvas(bCanvas,200), 50);
+  }
+
+  /* ---------- PDF 빌더 (html2canvas + jsPDF) ---------- */
+  async function buildAgreementPdfBlob(ag, isFinal){
+    const mount = document.createElement('div');
+    mount.style.position='fixed'; mount.style.left='-9999px'; mount.style.top='0';
+    mount.style.width='794px'; /* A4 width @96dpi approx */ mount.style.background='white'; mount.style.color='black';
+    mount.style.padding='24px'; mount.style.fontFamily='Pretendard, Noto Sans KR, Arial, sans-serif';
+    mount.innerHTML = `
+      <div style="border:2px solid #222; padding:16px; border-radius:8px;">
+        <h2 style="margin:0 0 8px 0; text-align:center;">재조사 합의 경계서</h2>
+        <div style="text-align:center; font-size:12px; color:#444;">요청ID: ${escapeHtml(ag.agid)} · 상태: ${escapeHtml(ag.status)} · 생성: ${new Date(ag.createdAt||Date.now()).toLocaleString()}</div>
+        <hr style="margin:12px 0">
+        <table style="width:100%; border-collapse:collapse; font-size:14px;">
+          <tr>
+            <td style="border:1px solid #999; padding:8px; width:20%; background:#f6f6f6;">위치(면/동/리/지번)</td>
+            <td style="border:1px solid #999; padding:8px;">${escapeHtml(ag.loc?.mdrj||'')}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #999; padding:8px; background:#f6f6f6;">A PNU</td>
+            <td style="border:1px solid #999; padding:8px;">${escapeHtml(ag.fromPnu)}</td>
+          </tr>
+          <tr>
+            <td style="border:1px solid #999; padding:8px; background:#f6f6f6;">B PNU</td>
+            <td style="border:1px solid #999; padding:8px;">${escapeHtml(ag.toPnu)}</td>
+          </tr>
+        </table>
+
+        <div style="margin-top:10px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div style="border:1px solid #999; padding:8px;">
+            <div style="font-weight:700; margin-bottom:6px;">A(요청자)</div>
+            <div>성명: ${escapeHtml(ag.from?.name||'')}</div>
+            <div>생년월일(7): ${escapeHtml(ag.from?.dob7||'')}</div>
+            <div>주소: ${escapeHtml(ag.from?.addr||'')}</div>
+          </div>
+          <div style="border:1px solid #999; padding:8px;">
+            <div style="font-weight:700; margin-bottom:6px;">B(상대)</div>
+            <div>성명: ${escapeHtml(ag.to?.name||'')}</div>
+            <div>생년월일(7): ${escapeHtml(ag.to?.dob7||'')}</div>
+            <div>주소: ${escapeHtml(ag.to?.addr||'')}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px; border:1px solid #999; padding:8px;">
+          <div style="font-weight:700; margin-bottom:6px;">협의 내용(요지)</div>
+          <div style="white-space:pre-wrap; line-height:1.5;">${escapeHtml(ag.note||'')}</div>
+        </div>
+
+        <div style="margin-top:12px; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+          <div>
+            <div style="font-size:12px; color:#555; margin-bottom:4px;">A 서명</div>
+            ${ag.aSigDataUrl ? `<img src="${ag.aSigDataUrl}" style="height:80px; border:1px solid #ccc;"/>` : '<div style="height:80px;border:1px dashed #ccc;"></div>'}
+          </div>
+          <div>
+            <div style="font-size:12px; color:#555; margin-bottom:4px;">B 서명</div>
+            ${ag.bSigDataUrl ? `<img src="${ag.bSigDataUrl}" style="height:80px; border:1px solid #ccc;"/>` : '<div style="height:80px;border:1px dashed #ccc;"></div>'}
+          </div>
+        </div>
+
+        <div style="margin-top:12px; font-size:11px; color:#666;">
+          ※ 본 문서는 내부 협의 기록용입니다. 법적 전자서명 효력은 별도 시스템에 따릅니다.
+        </div>
+      </div>`;
+    document.body.appendChild(mount);
+
+    const canvas = await html2canvas(mount, { scale: 2, backgroundColor:'#ffffff' });
+    mount.remove();
+
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new window.jspdf.jsPDF({ unit:'mm', format:'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW - 20; // margin
+    const imgH = canvas.height * imgW / canvas.width;
+    pdf.addImage(imgData, 'PNG', 10, 10, imgW, imgH);
+    return pdf.output('blob');
+  }
+
+  /* ---------- 유틸 ---------- */
+  function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
 
   function fmtDate(){ const d=new Date(); const p=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}`; }
   function downloadBlob(blob, filename){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000); }
-  function escapeHtml(s){ return String(s??'').replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])); }
   function sanitizeFile(s){ return s.replace(/[^\w\-가-힣]/g,'_').slice(0,60); }
   </script>
 </body>
